@@ -148,6 +148,7 @@
 <nav class="nav">
   <h1>Job Hunt Pro</h1>
   <button class="nav-btn active" onclick="switchTab('dashboard')">Dashboard</button>
+  <button class="nav-btn" onclick="switchTab('automation')">Automation</button>
   <button class="nav-btn" onclick="switchTab('search')">Job Search</button>
   <button class="nav-btn" onclick="switchTab('applications')">Applications</button>
   <button class="nav-btn" onclick="switchTab('quickapply')">Quick Apply</button>
@@ -167,6 +168,71 @@
       <div><button class="btn btn-primary" onclick="openAppModal()">+ Add Application</button></div>
     </div>
     <div class="table-wrap"><table><thead><tr><th>Company</th><th>Role</th><th>Status</th><th>Platform</th><th>Applied</th><th>Actions</th></tr></thead><tbody id="recent-table"></tbody></table></div>
+  </div>
+
+  <!-- ==================== AUTOMATION ==================== -->
+  <div id="tab-automation" class="tab">
+    <h2 style="margin-bottom:14px">Job Application Automation</h2>
+
+    <!-- Auto Stats -->
+    <div class="stats-grid" id="auto-stats-grid"></div>
+
+    <!-- Step 1: Fetch Jobs -->
+    <div class="settings-section">
+      <h3>Step 1: Fetch Jobs from Multiple Sources</h3>
+      <p style="font-size:12px;color:#64748b;margin-bottom:10px">Search across Remotive (free), Adzuna, and JSearch. Add API keys in Render env vars for more sources.</p>
+      <div class="search-bar">
+        <input id="auto-keywords" placeholder="Keywords (e.g. Java Developer, React, SDE)">
+        <input id="auto-location" placeholder="Location (e.g. India, Remote)" style="max-width:200px">
+        <input id="auto-limit" type="number" value="50" min="10" max="100" placeholder="Max" style="max-width:80px" title="Max results">
+        <button class="btn btn-primary" onclick="autoFetchJobs()">Fetch Jobs</button>
+      </div>
+      <div id="auto-sources" style="font-size:11px;color:#64748b;margin-bottom:8px"></div>
+      <div id="auto-fetch-status" style="font-size:13px;color:#94a3b8;padding:10px;text-align:center">Click "Fetch Jobs" to find relevant jobs automatically</div>
+      <div id="auto-fetch-results"></div>
+    </div>
+
+    <!-- Step 2: Review Queue -->
+    <div class="settings-section">
+      <h3>Step 2: Review & Select Jobs to Apply</h3>
+      <p style="font-size:12px;color:#64748b;margin-bottom:10px">Jobs in your WISHLIST queue. Select the ones you want to apply to, then bulk apply.</p>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-ghost" onclick="loadAutoQueue()">Refresh Queue</button>
+        <button class="btn btn-ghost" onclick="selectAllQueue()">Select All</button>
+        <button class="btn btn-ghost" onclick="deselectAllQueue()">Deselect All</button>
+        <span id="auto-queue-count" style="font-size:12px;color:#94a3b8"></span>
+      </div>
+      <div id="auto-queue-list" style="max-height:400px;overflow-y:auto"></div>
+    </div>
+
+    <!-- Step 3: Bulk Apply -->
+    <div class="settings-section">
+      <h3>Step 3: Bulk Apply</h3>
+      <p style="font-size:12px;color:#64748b;margin-bottom:10px">Auto-generate cover letters and mark as APPLIED. Optionally send emails if HR email is in notes.</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Cover Letter Template</label>
+          <select id="auto-template"></select>
+        </div>
+        <div class="form-group">
+          <label>Email Options</label>
+          <div style="padding-top:4px">
+            <label style="font-size:12px;color:#94a3b8"><input type="checkbox" id="auto-send-email"> Also send email (if HR email found in notes)</label>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="bulkApply()" id="bulk-apply-btn">Apply to Selected Jobs</button>
+        <span id="auto-apply-status" style="font-size:13px;color:#94a3b8"></span>
+      </div>
+      <div id="auto-apply-results" style="margin-top:12px"></div>
+    </div>
+
+    <!-- Apply Log -->
+    <div class="settings-section" id="auto-log-section" style="display:none">
+      <h3>Application Results</h3>
+      <div id="auto-apply-log"></div>
+    </div>
   </div>
 
   <!-- ==================== JOB SEARCH ==================== -->
@@ -421,6 +487,7 @@ function switchTab(name) {
   document.getElementById('tab-' + name).classList.add('active');
   document.querySelector('.nav-btn[onclick*="' + name + '"]').classList.add('active');
   if (name === 'dashboard') loadDashboard();
+  if (name === 'automation') loadAutomation();
   if (name === 'applications') loadApplications();
   if (name === 'prep') loadPrep();
   if (name === 'quickapply') loadQuickApply();
@@ -979,6 +1046,184 @@ function importData() {
     }
   };
   reader.readAsText(file);
+}
+
+// ============================== AUTOMATION ==============================
+let fetchedJobs = [];
+let queuedJobs = [];
+
+async function loadAutomation() {
+  // Load stats
+  var stats = await api('/api/auto/stats');
+  document.getElementById('auto-stats-grid').innerHTML = [
+    { num: stats.inQueue, label: 'In Queue', color: '#fbbf24' },
+    { num: stats.appliedToday, label: 'Applied Today', color: '#3b82f6' },
+    { num: stats.totalApplied, label: 'Total Applied', color: '#a78bfa' },
+    { num: stats.interviews, label: 'Interviews', color: '#22c55e' },
+  ].map(function(c) {
+    return '<div class="stat-card"><div class="num" style="color:' + c.color + '">' + c.num + '</div><div class="label">' + c.label + '</div></div>';
+  }).join('');
+
+  // Load templates
+  allTemplates = await api('/api/templates');
+  var sel = document.getElementById('auto-template');
+  sel.innerHTML = allTemplates.map(function(t) {
+    return '<option value="' + t.id + '">' + esc(t.name) + '</option>';
+  }).join('');
+
+  // Load queue
+  loadAutoQueue();
+}
+
+async function autoFetchJobs() {
+  var kw = document.getElementById('auto-keywords').value.trim();
+  var loc = document.getElementById('auto-location').value.trim();
+  var limit = document.getElementById('auto-limit').value || 50;
+  if (!kw) return toast('Enter keywords to search', true);
+
+  document.getElementById('auto-fetch-status').innerHTML = '<span style="color:#3b82f6">Fetching jobs from all sources... please wait</span>';
+  document.getElementById('auto-fetch-results').innerHTML = '';
+
+  try {
+    var data = await api('/api/auto/search-jobs?keywords=' + encodeURIComponent(kw) + '&location=' + encodeURIComponent(loc) + '&limit=' + limit);
+    fetchedJobs = data.jobs;
+
+    // Show sources
+    var srcHtml = 'Sources: <span style="color:#22c55e">Remotive (active)</span>';
+    if (data.sources.adzuna) srcHtml += ' | <span style="color:#22c55e">Adzuna (active)</span>';
+    else srcHtml += ' | <span style="color:#64748b">Adzuna (add ADZUNA_APP_ID + ADZUNA_API_KEY)</span>';
+    if (data.sources.jsearch) srcHtml += ' | <span style="color:#22c55e">JSearch (active)</span>';
+    else srcHtml += ' | <span style="color:#64748b">JSearch (add RAPIDAPI_KEY)</span>';
+    document.getElementById('auto-sources').innerHTML = srcHtml;
+
+    if (data.errors.length > 0) {
+      document.getElementById('auto-fetch-status').innerHTML = '<span style="color:#fbbf24">Found ' + fetchedJobs.length + ' jobs (some sources had errors: ' + esc(data.errors.join(', ')) + ')</span>';
+    } else {
+      document.getElementById('auto-fetch-status').innerHTML = '<span style="color:#22c55e">Found ' + fetchedJobs.length + ' jobs across all sources!</span>';
+    }
+
+    if (fetchedJobs.length === 0) {
+      document.getElementById('auto-fetch-results').innerHTML = '<p style="color:#64748b;padding:20px;text-align:center">No jobs found. Try different keywords.</p>';
+      return;
+    }
+
+    document.getElementById('auto-fetch-results').innerHTML =
+      '<div style="display:flex;gap:8px;margin:12px 0;align-items:center">' +
+      '<button class="btn btn-success" onclick="queueAllFetched()">Add All ' + fetchedJobs.length + ' to Queue</button>' +
+      '<span style="font-size:12px;color:#94a3b8">Or click individual jobs to add them</span></div>' +
+      fetchedJobs.map(function(j, i) {
+        return '<div class="job-card" style="padding:12px">' +
+          '<div style="display:flex;justify-content:space-between;align-items:start">' +
+          '<div><strong>' + esc(j.title) + '</strong><div class="meta">' + esc(j.company) + ' &bull; ' + esc(j.location) + (j.salary ? ' &bull; ' + esc(j.salary) : '') + ' &bull; <span class="badge badge-APPLIED">' + esc(j.source) + '</span></div></div>' +
+          '<button class="btn btn-sm btn-success" onclick="queueSingleJob(' + i + ', this)">+ Queue</button>' +
+          '</div></div>';
+      }).join('');
+  } catch (err) {
+    document.getElementById('auto-fetch-status').innerHTML = '<span style="color:#f87171">Error: ' + esc(err.message) + '</span>';
+  }
+}
+
+async function queueAllFetched() {
+  if (fetchedJobs.length === 0) return toast('No jobs to queue', true);
+  toast('Adding ' + fetchedJobs.length + ' jobs to queue...');
+  var result = await api('/api/auto/queue-jobs', 'POST', { jobs: fetchedJobs });
+  toast('Added ' + result.saved + ' jobs, skipped ' + result.skipped + ' duplicates');
+  loadAutoQueue();
+  loadAutomation();
+}
+
+async function queueSingleJob(index, btn) {
+  var j = fetchedJobs[index];
+  var result = await api('/api/auto/queue-jobs', 'POST', { jobs: [j] });
+  if (result.saved > 0) {
+    btn.textContent = 'Queued!';
+    btn.disabled = true;
+    btn.className = 'btn btn-sm btn-ghost';
+    toast(j.company + ' added to queue');
+    loadAutoQueue();
+  } else {
+    toast('Already in queue', true);
+  }
+}
+
+async function loadAutoQueue() {
+  queuedJobs = await api('/api/auto/queue');
+  document.getElementById('auto-queue-count').textContent = queuedJobs.length + ' jobs in queue';
+
+  if (queuedJobs.length === 0) {
+    document.getElementById('auto-queue-list').innerHTML = '<p style="color:#64748b;padding:20px;text-align:center">Queue is empty. Fetch jobs first (Step 1) to add them here.</p>';
+    return;
+  }
+
+  document.getElementById('auto-queue-list').innerHTML = queuedJobs.map(function(j) {
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid #334155">' +
+      '<input type="checkbox" class="queue-checkbox" value="' + j.id + '" checked>' +
+      '<div style="flex:1"><strong style="font-size:13px">' + esc(j.company) + '</strong> — ' + esc(j.role) +
+      '<div style="font-size:11px;color:#64748b">' + esc(j.location) + (j.salary_range ? ' | ' + esc(j.salary_range) : '') + ' | ' + esc(j.platform) + '</div></div>' +
+      (j.portal_url ? '<a class="btn btn-sm btn-ghost" href="' + esc(j.portal_url) + '" target="_blank">View</a>' : '') +
+      '<button class="btn btn-sm btn-danger" onclick="removeFromQueue(' + j.id + ')">Remove</button>' +
+      '</div>';
+  }).join('');
+}
+
+function selectAllQueue() {
+  document.querySelectorAll('.queue-checkbox').forEach(function(c) { c.checked = true; });
+}
+function deselectAllQueue() {
+  document.querySelectorAll('.queue-checkbox').forEach(function(c) { c.checked = false; });
+}
+
+async function removeFromQueue(id) {
+  await api('/api/applications/' + id, 'DELETE');
+  toast('Removed from queue');
+  loadAutoQueue();
+  loadAutomation();
+}
+
+async function bulkApply() {
+  var selectedIds = [];
+  document.querySelectorAll('.queue-checkbox:checked').forEach(function(c) {
+    selectedIds.push(parseInt(c.value));
+  });
+
+  if (selectedIds.length === 0) return toast('Select at least one job', true);
+
+  var templateId = document.getElementById('auto-template').value;
+  if (!templateId) return toast('Select a cover letter template', true);
+
+  var sendEmail = document.getElementById('auto-send-email').checked;
+
+  document.getElementById('bulk-apply-btn').disabled = true;
+  document.getElementById('auto-apply-status').textContent = 'Applying to ' + selectedIds.length + ' jobs... please wait';
+
+  try {
+    var result = await api('/api/auto/bulk-apply', 'POST', {
+      job_ids: selectedIds,
+      template_id: parseInt(templateId),
+      send_email: sendEmail
+    });
+
+    document.getElementById('auto-apply-status').innerHTML = '<span style="color:#22c55e">Done! Applied to ' + result.applied + ' jobs</span>';
+
+    // Show results log
+    document.getElementById('auto-log-section').style.display = 'block';
+    document.getElementById('auto-apply-log').innerHTML =
+      '<table style="width:100%"><thead><tr><th>Company</th><th>Role</th><th>Email</th><th>Status</th></tr></thead><tbody>' +
+      result.results.map(function(r) {
+        var emailBadge = r.emailStatus === 'sent' ? '<span class="badge badge-INTERVIEW">Sent</span>' :
+                         r.emailStatus === 'skipped' ? '<span class="badge badge-GHOSTED">No email</span>' :
+                         '<span class="badge badge-REJECTED">' + esc(r.emailStatus) + '</span>';
+        return '<tr><td>' + esc(r.company) + '</td><td>' + esc(r.role) + '</td><td>' + emailBadge + '</td><td><span class="badge badge-APPLIED">APPLIED</span></td></tr>';
+      }).join('') + '</tbody></table>';
+
+    toast('Applied to ' + result.applied + ' jobs!');
+    loadAutoQueue();
+    loadAutomation();
+  } catch (err) {
+    document.getElementById('auto-apply-status').innerHTML = '<span style="color:#f87171">Error: ' + esc(err.message) + '</span>';
+  }
+
+  document.getElementById('bulk-apply-btn').disabled = false;
 }
 
 // ============================== INIT ==============================
