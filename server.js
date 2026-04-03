@@ -179,123 +179,189 @@ Best regards,
 
 // Applications CRUD
 app.get('/api/applications', async (req, res) => {
-  const result = await pool.query('SELECT * FROM applications ORDER BY updated_at DESC');
-  res.json(result.rows);
+  try {
+    const result = await pool.query('SELECT * FROM applications ORDER BY updated_at DESC');
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/applications', async (req, res) => {
-  const { company, role, platform, portal_url, status, salary_range, location, notes, applied_date, interview_date, follow_up_date } = req.body;
-  const result = await pool.query(
-    `INSERT INTO applications (company, role, platform, portal_url, status, salary_range, location, notes, applied_date, interview_date, follow_up_date) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
-    [company, role, platform || '', portal_url || '', status || 'WISHLIST', salary_range || '', location || '', notes || '', applied_date || '', interview_date || '', follow_up_date || '']
-  );
-  res.json({ id: result.rows[0].id });
+  try {
+    const { company, role, platform, portal_url, status, salary_range, location, notes, applied_date, interview_date, follow_up_date } = req.body;
+    const result = await pool.query(
+      `INSERT INTO applications (company, role, platform, portal_url, status, salary_range, location, notes, applied_date, interview_date, follow_up_date) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+      [company, role, platform || '', portal_url || '', status || 'WISHLIST', salary_range || '', location || '', notes || '', applied_date || '', interview_date || '', follow_up_date || '']
+    );
+    res.json({ id: result.rows[0].id });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/applications/:id', async (req, res) => {
-  const { company, role, platform, portal_url, status, salary_range, location, notes, applied_date, interview_date, follow_up_date } = req.body;
-  await pool.query(
-    `UPDATE applications SET company=$1, role=$2, platform=$3, portal_url=$4, status=$5, salary_range=$6, location=$7, notes=$8, applied_date=$9, interview_date=$10, follow_up_date=$11, updated_at=NOW() WHERE id=$12`,
-    [company, role, platform || '', portal_url || '', status || 'WISHLIST', salary_range || '', location || '', notes || '', applied_date || '', interview_date || '', follow_up_date || '', req.params.id]
-  );
-  res.json({ ok: true });
+  try {
+    const { company, role, platform, portal_url, status, salary_range, location, notes, applied_date, interview_date, follow_up_date } = req.body;
+    await pool.query(
+      `UPDATE applications SET company=$1, role=$2, platform=$3, portal_url=$4, status=$5, salary_range=$6, location=$7, notes=$8, applied_date=$9, interview_date=$10, follow_up_date=$11, updated_at=NOW() WHERE id=$12`,
+      [company, role, platform || '', portal_url || '', status || 'WISHLIST', salary_range || '', location || '', notes || '', applied_date || '', interview_date || '', follow_up_date || '', req.params.id]
+    );
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/applications/:id', async (req, res) => {
-  await pool.query('DELETE FROM applications WHERE id=$1', [req.params.id]);
-  res.json({ ok: true });
+  try {
+    await pool.query('DELETE FROM applications WHERE id=$1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Bulk delete applications
+app.post('/api/applications/bulk-delete', async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !ids.length) return res.status(400).json({ error: 'No IDs provided' });
+    await pool.query('DELETE FROM applications WHERE id = ANY($1)', [ids]);
+    res.json({ ok: true, deleted: ids.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Bulk update status
+app.post('/api/applications/bulk-status', async (req, res) => {
+  try {
+    const { ids, status } = req.body;
+    if (!ids || !ids.length || !status) return res.status(400).json({ error: 'IDs and status required' });
+    await pool.query('UPDATE applications SET status=$1, updated_at=NOW() WHERE id = ANY($2)', [status, ids]);
+    res.json({ ok: true, updated: ids.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Prep topics
 app.get('/api/prep', async (req, res) => {
-  const result = await pool.query('SELECT * FROM prep_topics ORDER BY category, difficulty');
-  res.json(result.rows);
+  try {
+    const result = await pool.query('SELECT * FROM prep_topics ORDER BY category, difficulty');
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/prep/:id', async (req, res) => {
-  const { status, notes } = req.body;
-  await pool.query('UPDATE prep_topics SET status=$1, notes=$2 WHERE id=$3', [status, notes || '', req.params.id]);
-  res.json({ ok: true });
+  try {
+    const { status, notes } = req.body;
+    await pool.query('UPDATE prep_topics SET status=$1, notes=$2 WHERE id=$3', [status, notes || '', req.params.id]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/prep', async (req, res) => {
-  const { category, topic, difficulty, resource_url } = req.body;
-  const result = await pool.query(
-    'INSERT INTO prep_topics (category, topic, difficulty, resource_url) VALUES ($1,$2,$3,$4) RETURNING id',
-    [category, topic, difficulty || 'MEDIUM', resource_url || '']
-  );
-  res.json({ id: result.rows[0].id });
+  try {
+    const { category, topic, difficulty, resource_url } = req.body;
+    const result = await pool.query(
+      'INSERT INTO prep_topics (category, topic, difficulty, resource_url) VALUES ($1,$2,$3,$4) RETURNING id',
+      [category, topic, difficulty || 'MEDIUM', resource_url || '']
+    );
+    res.json({ id: result.rows[0].id });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Stats
 app.get('/api/stats', async (req, res) => {
-  const apps = await pool.query('SELECT status, COUNT(*) as count FROM applications GROUP BY status');
-  const prepStats = await pool.query('SELECT status, COUNT(*) as count FROM prep_topics GROUP BY status');
-  const total = await pool.query('SELECT COUNT(*) as c FROM applications');
-  const today = new Date().toISOString().split('T')[0];
-  const followUps = await pool.query(
-    `SELECT * FROM applications WHERE follow_up_date <= $1 AND status IN ('APPLIED','SCREENING','INTERVIEW') ORDER BY follow_up_date`,
-    [today]
-  );
-  res.json({ applicationsByStatus: apps.rows, prepByStatus: prepStats.rows, totalApplications: parseInt(total.rows[0].c), followUps: followUps.rows });
+  try {
+    const apps = await pool.query('SELECT status, COUNT(*) as count FROM applications GROUP BY status');
+    const prepStats = await pool.query('SELECT status, COUNT(*) as count FROM prep_topics GROUP BY status');
+    const total = await pool.query('SELECT COUNT(*) as c FROM applications');
+    const today = new Date().toISOString().split('T')[0];
+    const followUps = await pool.query(
+      `SELECT * FROM applications WHERE follow_up_date <= $1 AND status IN ('APPLIED','SCREENING','INTERVIEW') ORDER BY follow_up_date`,
+      [today]
+    );
+    // Daily application counts for last 30 days
+    const dailyTrend = await pool.query(
+      `SELECT applied_date as date, COUNT(*) as count FROM applications WHERE applied_date != '' AND applied_date >= (CURRENT_DATE - INTERVAL '30 days')::TEXT GROUP BY applied_date ORDER BY applied_date`
+    );
+    // Response rate: how many moved past APPLIED
+    const totalApplied = await pool.query("SELECT COUNT(*) as c FROM applications WHERE status != 'WISHLIST'");
+    const gotResponse = await pool.query("SELECT COUNT(*) as c FROM applications WHERE status IN ('SCREENING','INTERVIEW','OFFER')");
+    const avgDays = await pool.query(
+      `SELECT AVG(EXTRACT(DAY FROM (updated_at - created_at))) as avg_days FROM applications WHERE status IN ('SCREENING','INTERVIEW','OFFER') AND updated_at > created_at`
+    );
+    res.json({
+      applicationsByStatus: apps.rows,
+      prepByStatus: prepStats.rows,
+      totalApplications: parseInt(total.rows[0].c),
+      followUps: followUps.rows,
+      dailyTrend: dailyTrend.rows,
+      responseRate: parseInt(totalApplied.rows[0].c) > 0 ? Math.round(parseInt(gotResponse.rows[0].c) / parseInt(totalApplied.rows[0].c) * 100) : 0,
+      avgResponseDays: avgDays.rows[0].avg_days ? Math.round(parseFloat(avgDays.rows[0].avg_days)) : null
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Profile
 app.get('/api/profile', async (req, res) => {
-  const result = await pool.query('SELECT * FROM profile WHERE id=1');
-  res.json(result.rows[0]);
+  try {
+    const result = await pool.query('SELECT * FROM profile WHERE id=1');
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/profile', async (req, res) => {
-  const { full_name, email, phone, linkedin_url, github_url, portfolio_url, current_role, experience_years, skills, summary } = req.body;
-  await pool.query(
-    `UPDATE profile SET full_name=$1, email=$2, phone=$3, linkedin_url=$4, github_url=$5, portfolio_url=$6, current_role=$7, experience_years=$8, skills=$9, summary=$10 WHERE id=1`,
-    [full_name || '', email || '', phone || '', linkedin_url || '', github_url || '', portfolio_url || '', current_role || '', experience_years || '', skills || '', summary || '']
-  );
-  res.json({ ok: true });
+  try {
+    const { full_name, email, phone, linkedin_url, github_url, portfolio_url, current_role, experience_years, skills, summary } = req.body;
+    await pool.query(
+      `UPDATE profile SET full_name=$1, email=$2, phone=$3, linkedin_url=$4, github_url=$5, portfolio_url=$6, current_role=$7, experience_years=$8, skills=$9, summary=$10 WHERE id=1`,
+      [full_name || '', email || '', phone || '', linkedin_url || '', github_url || '', portfolio_url || '', current_role || '', experience_years || '', skills || '', summary || '']
+    );
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Resume upload
 app.post('/api/resume', upload.single('resume'), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No file' });
-  await pool.query('UPDATE profile SET resume_path=$1 WHERE id=1', [req.file.filename]);
-  res.json({ ok: true, filename: req.file.filename });
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file' });
+    await pool.query('UPDATE profile SET resume_path=$1 WHERE id=1', [req.file.filename]);
+    res.json({ ok: true, filename: req.file.filename });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/resume-info', async (req, res) => {
-  const result = await pool.query('SELECT resume_path FROM profile WHERE id=1');
-  const p = result.rows[0];
-  if (p && p.resume_path) {
-    const fullPath = path.join(__dirname, 'uploads', p.resume_path);
-    const exists = fs.existsSync(fullPath);
-    res.json({ exists, filename: p.resume_path });
-  } else {
-    res.json({ exists: false, filename: null });
-  }
+  try {
+    const result = await pool.query('SELECT resume_path FROM profile WHERE id=1');
+    const p = result.rows[0];
+    if (p && p.resume_path) {
+      const fullPath = path.join(__dirname, 'uploads', p.resume_path);
+      const exists = fs.existsSync(fullPath);
+      res.json({ exists, filename: p.resume_path });
+    } else {
+      res.json({ exists: false, filename: null });
+    }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Email config
 app.get('/api/email-config', async (req, res) => {
-  const result = await pool.query('SELECT * FROM email_config WHERE id=1');
-  const cfg = { ...result.rows[0] };
-  if (cfg.smtp_pass) cfg.smtp_pass = '********';
-  res.json(cfg);
+  try {
+    const result = await pool.query('SELECT * FROM email_config WHERE id=1');
+    const cfg = { ...result.rows[0] };
+    if (cfg.smtp_pass) cfg.smtp_pass = '********';
+    res.json(cfg);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/email-config', async (req, res) => {
-  const { smtp_host, smtp_port, smtp_user, smtp_pass, from_name } = req.body;
-  if (smtp_pass && smtp_pass !== '********') {
-    await pool.query(
-      'UPDATE email_config SET smtp_host=$1, smtp_port=$2, smtp_user=$3, smtp_pass=$4, from_name=$5 WHERE id=1',
-      [smtp_host || 'smtp.gmail.com', smtp_port || 587, smtp_user || '', smtp_pass, from_name || '']
-    );
-  } else {
-    await pool.query(
-      'UPDATE email_config SET smtp_host=$1, smtp_port=$2, smtp_user=$3, from_name=$4 WHERE id=1',
-      [smtp_host || 'smtp.gmail.com', smtp_port || 587, smtp_user || '', from_name || '']
-    );
-  }
-  res.json({ ok: true });
+  try {
+    const { smtp_host, smtp_port, smtp_user, smtp_pass, from_name } = req.body;
+    if (smtp_pass && smtp_pass !== '********') {
+      await pool.query(
+        'UPDATE email_config SET smtp_host=$1, smtp_port=$2, smtp_user=$3, smtp_pass=$4, from_name=$5 WHERE id=1',
+        [smtp_host || 'smtp.gmail.com', smtp_port || 587, smtp_user || '', smtp_pass, from_name || '']
+      );
+    } else {
+      await pool.query(
+        'UPDATE email_config SET smtp_host=$1, smtp_port=$2, smtp_user=$3, from_name=$4 WHERE id=1',
+        [smtp_host || 'smtp.gmail.com', smtp_port || 587, smtp_user || '', from_name || '']
+      );
+    }
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Send email application
@@ -338,58 +404,68 @@ app.post('/api/send-email', async (req, res) => {
 
 // Cover letter templates
 app.get('/api/templates', async (req, res) => {
-  const result = await pool.query('SELECT * FROM cover_templates');
-  res.json(result.rows);
+  try {
+    const result = await pool.query('SELECT * FROM cover_templates');
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/templates', async (req, res) => {
-  const { name, subject, body } = req.body;
-  const result = await pool.query(
-    'INSERT INTO cover_templates (name, subject, body) VALUES ($1,$2,$3) RETURNING id',
-    [name, subject || '', body || '']
-  );
-  res.json({ id: result.rows[0].id });
+  try {
+    const { name, subject, body } = req.body;
+    const result = await pool.query(
+      'INSERT INTO cover_templates (name, subject, body) VALUES ($1,$2,$3) RETURNING id',
+      [name, subject || '', body || '']
+    );
+    res.json({ id: result.rows[0].id });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/templates/:id', async (req, res) => {
-  const { name, subject, body } = req.body;
-  await pool.query(
-    'UPDATE cover_templates SET name=$1, subject=$2, body=$3 WHERE id=$4',
-    [name, subject || '', body || '', req.params.id]
-  );
-  res.json({ ok: true });
+  try {
+    const { name, subject, body } = req.body;
+    await pool.query(
+      'UPDATE cover_templates SET name=$1, subject=$2, body=$3 WHERE id=$4',
+      [name, subject || '', body || '', req.params.id]
+    );
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/templates/:id', async (req, res) => {
-  await pool.query('DELETE FROM cover_templates WHERE id=$1', [req.params.id]);
-  res.json({ ok: true });
+  try {
+    await pool.query('DELETE FROM cover_templates WHERE id=$1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Generate cover letter from template
 app.post('/api/generate-cover', async (req, res) => {
-  const { template_id, company, role } = req.body;
-  const tplResult = await pool.query('SELECT * FROM cover_templates WHERE id=$1', [template_id]);
-  if (tplResult.rows.length === 0) return res.status(404).json({ error: 'Template not found' });
-  const tpl = tplResult.rows[0];
-  const profileResult = await pool.query('SELECT * FROM profile WHERE id=1');
-  const profile = profileResult.rows[0];
+  try {
+    const { template_id, company, role } = req.body;
+    const tplResult = await pool.query('SELECT * FROM cover_templates WHERE id=$1', [template_id]);
+    if (tplResult.rows.length === 0) return res.status(404).json({ error: 'Template not found' });
+    const tpl = tplResult.rows[0];
+    const profileResult = await pool.query('SELECT * FROM profile WHERE id=1');
+    const profile = profileResult.rows[0];
 
-  const replace = (str) => {
-    return str
-      .replace(/\{company\}/g, company || '')
-      .replace(/\{role\}/g, role || '')
-      .replace(/\{full_name\}/g, profile.full_name || '')
-      .replace(/\{email\}/g, profile.email || '')
-      .replace(/\{phone\}/g, profile.phone || '')
-      .replace(/\{linkedin_url\}/g, profile.linkedin_url || '')
-      .replace(/\{github_url\}/g, profile.github_url || '')
-      .replace(/\{current_role\}/g, profile.current_role || '')
-      .replace(/\{experience_years\}/g, profile.experience_years || '')
-      .replace(/\{skills\}/g, profile.skills || '')
-      .replace(/\{summary\}/g, profile.summary || '');
-  };
+    const replace = (str) => {
+      return str
+        .replace(/\{company\}/g, company || '')
+        .replace(/\{role\}/g, role || '')
+        .replace(/\{full_name\}/g, profile.full_name || '')
+        .replace(/\{email\}/g, profile.email || '')
+        .replace(/\{phone\}/g, profile.phone || '')
+        .replace(/\{linkedin_url\}/g, profile.linkedin_url || '')
+        .replace(/\{github_url\}/g, profile.github_url || '')
+        .replace(/\{current_role\}/g, profile.current_role || '')
+        .replace(/\{experience_years\}/g, profile.experience_years || '')
+        .replace(/\{skills\}/g, profile.skills || '')
+        .replace(/\{summary\}/g, profile.summary || '');
+    };
 
-  res.json({ subject: replace(tpl.subject), body: replace(tpl.body) });
+    res.json({ subject: replace(tpl.subject), body: replace(tpl.body) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Data export/import (backup)
@@ -450,6 +526,52 @@ app.post('/api/import', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ============================== DAILY LOG ==============================
+
+app.get('/api/daily-log', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM daily_log ORDER BY date DESC LIMIT 30');
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/daily-log', async (req, res) => {
+  try {
+    const { date, applications_sent, problems_solved, notes } = req.body;
+    const d = date || new Date().toISOString().split('T')[0];
+    // Upsert: update if date exists, insert if not
+    const existing = await pool.query('SELECT id FROM daily_log WHERE date=$1', [d]);
+    if (existing.rows.length > 0) {
+      await pool.query(
+        'UPDATE daily_log SET applications_sent=$1, problems_solved=$2, notes=$3 WHERE date=$4',
+        [applications_sent || 0, problems_solved || 0, notes || '', d]
+      );
+      res.json({ ok: true, id: existing.rows[0].id });
+    } else {
+      const result = await pool.query(
+        'INSERT INTO daily_log (date, applications_sent, problems_solved, notes) VALUES ($1,$2,$3,$4) RETURNING id',
+        [d, applications_sent || 0, problems_solved || 0, notes || '']
+      );
+      res.json({ ok: true, id: result.rows[0].id });
+    }
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ============================== AUTO-GHOSTED ==============================
+
+// Mark stale applications as GHOSTED (no update in 30+ days while in APPLIED/SCREENING)
+app.post('/api/auto-ghost', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE applications SET status='GHOSTED', updated_at=NOW()
+       WHERE status IN ('APPLIED','SCREENING')
+       AND updated_at < NOW() - INTERVAL '30 days'
+       RETURNING id, company, role`
+    );
+    res.json({ ok: true, ghosted: result.rows.length, applications: result.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ============================== AUTOMATION APIs ==============================

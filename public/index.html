@@ -60,15 +60,16 @@
 
   /* Buttons */
   .btn { padding: 7px 14px; border-radius: 8px; border: none; cursor: pointer; font-size: 12px; font-weight: 500; transition: .2s; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
   .btn-primary { background: #3b82f6; color: #fff; }
-  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:hover:not(:disabled) { background: #2563eb; }
   .btn-sm { padding: 3px 8px; font-size: 11px; }
   .btn-danger { background: #991b1b; color: #fca5a5; }
-  .btn-danger:hover { background: #7f1d1d; }
+  .btn-danger:hover:not(:disabled) { background: #7f1d1d; }
   .btn-ghost { background: transparent; color: #94a3b8; border: 1px solid #334155; }
-  .btn-ghost:hover { background: #1e293b; }
+  .btn-ghost:hover:not(:disabled) { background: #1e293b; }
   .btn-success { background: #166534; color: #bbf7d0; }
-  .btn-success:hover { background: #14532d; }
+  .btn-success:hover:not(:disabled) { background: #14532d; }
   .btn-warn { background: #92400e; color: #fde68a; }
 
   /* Filters */
@@ -137,6 +138,35 @@
   .toast.show { transform: translateY(0); opacity: 1; }
   .toast.error { background: #ef4444; }
 
+  /* Loading spinner */
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #334155; border-top-color: #3b82f6; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-overlay { text-align: center; padding: 30px; color: #94a3b8; }
+
+  /* Chart bars */
+  .chart-container { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+  .chart-container h3 { font-size: 14px; color: #94a3b8; margin-bottom: 12px; }
+  .bar-chart { display: flex; align-items: flex-end; gap: 3px; height: 120px; padding-top: 10px; }
+  .bar-col { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; }
+  .bar { width: 100%; max-width: 24px; background: linear-gradient(180deg, #3b82f6, #6366f1); border-radius: 3px 3px 0 0; min-height: 2px; transition: height .4s; }
+  .bar-label { font-size: 9px; color: #64748b; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 30px; }
+  .bar-value { font-size: 9px; color: #94a3b8; margin-bottom: 2px; }
+
+  /* Funnel */
+  .funnel { display: flex; flex-direction: column; gap: 4px; }
+  .funnel-row { display: flex; align-items: center; gap: 10px; }
+  .funnel-bar { height: 28px; border-radius: 4px; display: flex; align-items: center; padding: 0 10px; font-size: 12px; font-weight: 600; color: #fff; transition: width .4s; min-width: 40px; }
+  .funnel-label { font-size: 12px; color: #94a3b8; min-width: 90px; text-align: right; }
+
+  /* Bulk action bar */
+  .bulk-bar { background: #1e3a5f; border: 1px solid #3b82f6; border-radius: 10px; padding: 10px 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .bulk-bar .count { font-size: 13px; font-weight: 600; color: #60a5fa; }
+
+  /* Daily log */
+  .log-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .log-cell { aspect-ratio: 1; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; cursor: pointer; transition: .2s; }
+  .log-cell:hover { transform: scale(1.1); }
+
   @media (max-width: 640px) {
     .form-row { grid-template-columns: 1fr; }
     .stats-grid { grid-template-columns: repeat(3, 1fr); }
@@ -148,6 +178,7 @@
 <nav class="nav">
   <h1>Job Hunt Pro</h1>
   <button class="nav-btn active" onclick="switchTab('dashboard')">Dashboard</button>
+  <button class="nav-btn" onclick="switchTab('analytics')">Analytics</button>
   <button class="nav-btn" onclick="switchTab('automation')">Automation</button>
   <button class="nav-btn" onclick="switchTab('search')">Job Search</button>
   <button class="nav-btn" onclick="switchTab('applications')">Applications</button>
@@ -163,6 +194,21 @@
   <div id="tab-dashboard" class="tab active">
     <div id="followup-banner"></div>
     <div class="stats-grid" id="stats-grid"></div>
+
+    <!-- Daily Log Widget -->
+    <div class="chart-container">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3 style="margin:0">Today's Log</h3>
+        <span id="daily-log-date" style="font-size:12px;color:#64748b"></span>
+      </div>
+      <div class="form-row" style="margin-bottom:10px">
+        <div class="form-group"><label>Applications Sent</label><input type="number" id="dl-apps" min="0" value="0"></div>
+        <div class="form-group"><label>Problems Solved</label><input type="number" id="dl-problems" min="0" value="0"></div>
+      </div>
+      <div class="form-group"><label>Notes</label><textarea id="dl-notes" style="min-height:40px" placeholder="What did you accomplish today?"></textarea></div>
+      <button class="btn btn-primary" onclick="saveDailyLog()">Save Today's Log</button>
+    </div>
+
     <div class="section-header">
       <h2>Recent Applications</h2>
       <div><button class="btn btn-primary" onclick="openAppModal()">+ Add Application</button></div>
@@ -170,11 +216,43 @@
     <div class="table-wrap"><table><thead><tr><th>Company</th><th>Role</th><th>Status</th><th>Platform</th><th>Applied</th><th>Actions</th></tr></thead><tbody id="recent-table"></tbody></table></div>
   </div>
 
+  <!-- ==================== ANALYTICS ==================== -->
+  <div id="tab-analytics" class="tab">
+    <h2 style="margin-bottom:14px">Analytics</h2>
+    <div class="stats-grid" id="analytics-stats"></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <!-- Funnel -->
+      <div class="chart-container">
+        <h3>Application Funnel</h3>
+        <div class="funnel" id="funnel-chart"></div>
+      </div>
+      <!-- Response rate -->
+      <div class="chart-container">
+        <h3>Key Metrics</h3>
+        <div id="key-metrics"></div>
+      </div>
+    </div>
+
+    <!-- Daily trend chart -->
+    <div class="chart-container">
+      <h3>Applications Per Day (Last 30 Days)</h3>
+      <div class="bar-chart" id="daily-chart"></div>
+    </div>
+
+    <!-- Daily log history -->
+    <div class="chart-container">
+      <h3>Daily Log History</h3>
+      <div class="table-wrap">
+        <table><thead><tr><th>Date</th><th>Apps Sent</th><th>Problems Solved</th><th>Notes</th></tr></thead><tbody id="log-history-table"></tbody></table>
+      </div>
+    </div>
+  </div>
+
   <!-- ==================== AUTOMATION ==================== -->
   <div id="tab-automation" class="tab">
     <h2 style="margin-bottom:14px">Job Application Automation</h2>
 
-    <!-- Auto Stats -->
     <div class="stats-grid" id="auto-stats-grid"></div>
 
     <!-- Step 1: Fetch Jobs -->
@@ -185,7 +263,7 @@
         <input id="auto-keywords" placeholder="Keywords (e.g. Java Developer, React, SDE)">
         <input id="auto-location" placeholder="Location (e.g. India, Remote)" style="max-width:200px">
         <input id="auto-limit" type="number" value="50" min="10" max="100" placeholder="Max" style="max-width:80px" title="Max results">
-        <button class="btn btn-primary" onclick="autoFetchJobs()">Fetch Jobs</button>
+        <button class="btn btn-primary" onclick="autoFetchJobs()" id="auto-fetch-btn">Fetch Jobs</button>
       </div>
       <div id="auto-sources" style="font-size:11px;color:#64748b;margin-bottom:8px"></div>
       <div id="auto-fetch-status" style="font-size:13px;color:#94a3b8;padding:10px;text-align:center">Click "Fetch Jobs" to find relevant jobs automatically</div>
@@ -228,7 +306,6 @@
       <div id="auto-apply-results" style="margin-top:12px"></div>
     </div>
 
-    <!-- Apply Log -->
     <div class="settings-section" id="auto-log-section" style="display:none">
       <h3>Application Results</h3>
       <div id="auto-apply-log"></div>
@@ -241,13 +318,13 @@
     <div class="search-bar">
       <input id="search-keywords" placeholder="Keywords (e.g. Java Developer, SDE 2)">
       <input id="search-location" placeholder="Location (e.g. Bangalore, Remote)" style="max-width:220px">
-      <button class="btn btn-primary" onclick="searchJobs()">Search</button>
+      <button class="btn btn-primary" onclick="searchJobs()" id="search-btn">Search</button>
     </div>
     <p style="font-size:12px;color:#64748b;margin-bottom:12px">Quick search on portals (opens pre-filled search in new tab):</p>
     <div class="portal-links" id="portal-links"></div>
     <div id="search-results"></div>
     <div id="search-empty" style="text-align:center;color:#64748b;padding:40px;font-size:14px">
-      Enter keywords above to search remote tech jobs, or click a portal link to search directly on job sites.
+      Enter keywords above to search jobs across multiple sources, or click a portal link to search directly.
     </div>
   </div>
 
@@ -255,16 +332,30 @@
   <div id="tab-applications" class="tab">
     <div class="section-header">
       <h2>All Applications</h2>
-      <button class="btn btn-primary" onclick="openAppModal()">+ Add Application</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="app-search" placeholder="Search company or role..." style="padding:6px 10px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:13px;width:200px" oninput="renderAppsTable()">
+        <button class="btn btn-primary" onclick="openAppModal()">+ Add Application</button>
+      </div>
     </div>
     <div class="filters" id="status-filters"></div>
-    <div class="table-wrap"><table><thead><tr><th>Company</th><th>Role</th><th>Platform</th><th>Location</th><th>Salary</th><th>Status</th><th>Applied</th><th>Follow-up</th><th>Actions</th></tr></thead><tbody id="apps-table"></tbody></table></div>
+    <!-- Bulk action bar -->
+    <div class="bulk-bar" id="bulk-action-bar" style="display:none">
+      <span class="count" id="bulk-count">0 selected</span>
+      <select id="bulk-status-select" style="padding:4px 8px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:12px">
+        <option value="">Change status to...</option>
+        <option>WISHLIST</option><option>APPLIED</option><option>SCREENING</option><option>INTERVIEW</option><option>OFFER</option><option>REJECTED</option><option>GHOSTED</option>
+      </select>
+      <button class="btn btn-sm btn-primary" onclick="bulkStatusChange()">Apply Status</button>
+      <button class="btn btn-sm btn-danger" onclick="bulkDeleteApps()">Delete Selected</button>
+      <button class="btn btn-sm btn-ghost" onclick="clearBulkSelection()">Clear Selection</button>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th><input type="checkbox" id="select-all-apps" onchange="toggleSelectAll(this)"></th><th>Company</th><th>Role</th><th>Platform</th><th>Location</th><th>Salary</th><th>Status</th><th>Applied</th><th>Follow-up</th><th>Actions</th></tr></thead><tbody id="apps-table"></tbody></table></div>
   </div>
 
   <!-- ==================== QUICK APPLY ==================== -->
   <div id="tab-quickapply" class="tab">
     <h2 style="margin-bottom:14px">Quick Apply</h2>
-    <p style="font-size:13px;color:#94a3b8;margin-bottom:16px">Generate a personalized cover letter, copy it, and open the apply page — all in one click. Set up your profile in Settings first.</p>
+    <p style="font-size:13px;color:#94a3b8;margin-bottom:16px">Generate a personalized cover letter, copy it, and open the apply page. Set up your profile in Settings first.</p>
 
     <div class="quick-apply-box">
       <h3>Generate Cover Letter</h3>
@@ -327,6 +418,14 @@
   <div id="tab-settings" class="tab">
     <h2 style="margin-bottom:14px">Settings</h2>
 
+    <!-- Auto-Ghost -->
+    <div class="settings-section">
+      <h3>Auto-Ghosted Detection</h3>
+      <p style="font-size:12px;color:#64748b;margin-bottom:10px">Mark applications as GHOSTED if they've been in APPLIED or SCREENING status for 30+ days with no updates.</p>
+      <button class="btn btn-warn" onclick="runAutoGhost()" id="ghost-btn">Detect Ghosted Applications</button>
+      <span id="ghost-result" style="font-size:13px;color:#94a3b8;margin-left:10px"></span>
+    </div>
+
     <div class="settings-section">
       <h3>Your Profile</h3>
       <p style="font-size:12px;color:#64748b;margin-bottom:12px">This info is used to auto-fill cover letters.</p>
@@ -374,7 +473,7 @@
         <div class="form-group"><label>SMTP User (email)</label><input id="s-smtp-user"></div>
         <div class="form-group"><label>SMTP Password / App Password</label><input id="s-smtp-pass" type="password"></div>
       </div>
-      <div class="form-group"><label>From Name</label><input id="s-from-name" placeholder="Shubham Kumar Thakur"></div>
+      <div class="form-group"><label>From Name</label><input id="s-from-name" placeholder="Your Name"></div>
       <button class="btn btn-primary" onclick="saveEmailConfig()">Save Email Config</button>
     </div>
 
@@ -469,24 +568,38 @@
   </div>
 </div>
 
+<!-- Confirm Modal -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal" style="max-width:400px;text-align:center">
+    <h2 id="confirm-title">Confirm</h2>
+    <p id="confirm-msg" style="color:#94a3b8;margin:16px 0;font-size:14px"></p>
+    <div class="form-actions" style="justify-content:center">
+      <button class="btn btn-ghost" onclick="closeModal('confirm-modal')">Cancel</button>
+      <button class="btn btn-primary" id="confirm-ok-btn">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
 // ============================== STATE ==============================
-let allApps = [];
-let allPrep = [];
-let allTemplates = [];
-let currentFilter = 'ALL';
-let generatedSubject = '';
-let generatedBody = '';
+var allApps = [];
+var allPrep = [];
+var allTemplates = [];
+var currentFilter = 'ALL';
+var generatedSubject = '';
+var generatedBody = '';
+var selectedAppIds = new Set();
 
 // ============================== TABS ==============================
 function switchTab(name) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelectorAll('.nav-btn').forEach(function(b) { b.classList.remove('active'); });
   document.getElementById('tab-' + name).classList.add('active');
   document.querySelector('.nav-btn[onclick*="' + name + '"]').classList.add('active');
   if (name === 'dashboard') loadDashboard();
+  if (name === 'analytics') loadAnalytics();
   if (name === 'automation') loadAutomation();
   if (name === 'applications') loadApplications();
   if (name === 'prep') loadPrep();
@@ -508,7 +621,9 @@ async function api(url, method, body) {
   var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
   var res = await fetch(url, opts);
-  return res.json();
+  var data = await res.json();
+  if (data.error && !res.ok) { toast(data.error, true); throw new Error(data.error); }
+  return data;
 }
 
 function esc(s) {
@@ -524,11 +639,35 @@ document.querySelectorAll('.modal-overlay').forEach(function(el) {
   el.addEventListener('click', function(e) { if (e.target === el) el.classList.remove('open'); });
 });
 
+function showConfirm(title, msg, onOk) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-msg').textContent = msg;
+  var btn = document.getElementById('confirm-ok-btn');
+  var newBtn = btn.cloneNode(true);
+  btn.parentNode.replaceChild(newBtn, btn);
+  newBtn.addEventListener('click', function() { closeModal('confirm-modal'); onOk(); });
+  document.getElementById('confirm-modal').classList.add('open');
+}
+
+function setLoading(elId, loading) {
+  var el = document.getElementById(elId);
+  if (!el) return;
+  if (loading) {
+    el.disabled = true;
+    el.dataset.origText = el.textContent;
+    el.innerHTML = '<span class="spinner"></span>Loading...';
+  } else {
+    el.disabled = false;
+    el.textContent = el.dataset.origText || 'Done';
+  }
+}
+
 // ============================== DASHBOARD ==============================
 async function loadDashboard() {
-  var data = await Promise.all([api('/api/stats'), api('/api/applications')]);
+  var data = await Promise.all([api('/api/stats'), api('/api/applications'), api('/api/daily-log')]);
   var stats = data[0];
   allApps = data[1];
+  var logs = data[2];
 
   // Follow-up alerts
   var banner = document.getElementById('followup-banner');
@@ -542,9 +681,9 @@ async function loadDashboard() {
   }
 
   var byStatus = {};
-  stats.applicationsByStatus.forEach(function(s) { byStatus[s.status] = s.count; });
+  stats.applicationsByStatus.forEach(function(s) { byStatus[s.status] = parseInt(s.count); });
   var prepDone = stats.prepByStatus.find(function(p) { return p.status === 'DONE'; });
-  var prepTotal = stats.prepByStatus.reduce(function(a, p) { return a + p.count; }, 0);
+  var prepTotal = stats.prepByStatus.reduce(function(a, p) { return a + parseInt(p.count); }, 0);
   var active = (byStatus['APPLIED'] || 0) + (byStatus['SCREENING'] || 0) + (byStatus['INTERVIEW'] || 0);
 
   var cards = [
@@ -553,12 +692,20 @@ async function loadDashboard() {
     { num: byStatus['INTERVIEW'] || 0, label: 'Interviews', color: '#22c55e' },
     { num: byStatus['OFFER'] || 0, label: 'Offers', color: '#84cc16' },
     { num: byStatus['REJECTED'] || 0, label: 'Rejected', color: '#f87171' },
-    { num: (prepDone ? prepDone.count : 0) + '/' + prepTotal, label: 'Prep Done', color: '#fbbf24' },
+    { num: (prepDone ? parseInt(prepDone.count) : 0) + '/' + prepTotal, label: 'Prep Done', color: '#fbbf24' },
   ];
 
   document.getElementById('stats-grid').innerHTML = cards.map(function(c) {
     return '<div class="stat-card"><div class="num" style="color:' + c.color + '">' + c.num + '</div><div class="label">' + c.label + '</div></div>';
   }).join('');
+
+  // Daily log widget
+  var today = new Date().toISOString().split('T')[0];
+  document.getElementById('daily-log-date').textContent = today;
+  var todayLog = logs.find(function(l) { return l.date === today; });
+  document.getElementById('dl-apps').value = todayLog ? todayLog.applications_sent : 0;
+  document.getElementById('dl-problems').value = todayLog ? todayLog.problems_solved : 0;
+  document.getElementById('dl-notes').value = todayLog ? todayLog.notes || '' : '';
 
   var recent = allApps.slice(0, 10);
   document.getElementById('recent-table').innerHTML = recent.length === 0
@@ -572,9 +719,87 @@ async function loadDashboard() {
     }).join('');
 }
 
+async function saveDailyLog() {
+  var today = new Date().toISOString().split('T')[0];
+  await api('/api/daily-log', 'POST', {
+    date: today,
+    applications_sent: parseInt(document.getElementById('dl-apps').value) || 0,
+    problems_solved: parseInt(document.getElementById('dl-problems').value) || 0,
+    notes: document.getElementById('dl-notes').value.trim()
+  });
+  toast('Daily log saved!');
+}
+
+// ============================== ANALYTICS ==============================
+async function loadAnalytics() {
+  var data = await Promise.all([api('/api/stats'), api('/api/daily-log')]);
+  var stats = data[0];
+  var logs = data[1];
+
+  var byStatus = {};
+  stats.applicationsByStatus.forEach(function(s) { byStatus[s.status] = parseInt(s.count); });
+
+  // Stats cards
+  document.getElementById('analytics-stats').innerHTML = [
+    { num: stats.totalApplications, label: 'Total Applications', color: '#3b82f6' },
+    { num: stats.responseRate + '%', label: 'Response Rate', color: '#22c55e' },
+    { num: stats.avgResponseDays !== null ? stats.avgResponseDays + 'd' : 'N/A', label: 'Avg Response Time', color: '#fbbf24' },
+    { num: byStatus['GHOSTED'] || 0, label: 'Ghosted', color: '#a1a1aa' },
+  ].map(function(c) {
+    return '<div class="stat-card"><div class="num" style="color:' + c.color + '">' + c.num + '</div><div class="label">' + c.label + '</div></div>';
+  }).join('');
+
+  // Funnel chart
+  var funnelData = [
+    { label: 'Applied', count: (byStatus['APPLIED'] || 0) + (byStatus['SCREENING'] || 0) + (byStatus['INTERVIEW'] || 0) + (byStatus['OFFER'] || 0) + (byStatus['REJECTED'] || 0) + (byStatus['GHOSTED'] || 0), color: '#3b82f6' },
+    { label: 'Screening', count: (byStatus['SCREENING'] || 0) + (byStatus['INTERVIEW'] || 0) + (byStatus['OFFER'] || 0), color: '#a78bfa' },
+    { label: 'Interview', count: (byStatus['INTERVIEW'] || 0) + (byStatus['OFFER'] || 0), color: '#22c55e' },
+    { label: 'Offer', count: byStatus['OFFER'] || 0, color: '#84cc16' },
+  ];
+  var maxFunnel = Math.max(funnelData[0].count, 1);
+  document.getElementById('funnel-chart').innerHTML = funnelData.map(function(f) {
+    var pct = Math.max(Math.round(f.count / maxFunnel * 100), 8);
+    return '<div class="funnel-row"><span class="funnel-label">' + f.label + '</span>' +
+      '<div class="funnel-bar" style="width:' + pct + '%;background:' + f.color + '">' + f.count + '</div></div>';
+  }).join('');
+
+  // Key metrics
+  var rejected = byStatus['REJECTED'] || 0;
+  var ghosted = byStatus['GHOSTED'] || 0;
+  var total = stats.totalApplications || 1;
+  document.getElementById('key-metrics').innerHTML =
+    '<div style="display:flex;flex-direction:column;gap:14px;padding:8px 0">' +
+    '<div><span style="font-size:24px;font-weight:700;color:#3b82f6">' + stats.responseRate + '%</span><div style="font-size:12px;color:#94a3b8">Response Rate (moved past Applied)</div></div>' +
+    '<div><span style="font-size:24px;font-weight:700;color:#f87171">' + Math.round((rejected + ghosted) / total * 100) + '%</span><div style="font-size:12px;color:#94a3b8">Rejection + Ghost Rate</div></div>' +
+    '<div><span style="font-size:24px;font-weight:700;color:#fbbf24">' + (stats.avgResponseDays !== null ? stats.avgResponseDays + ' days' : 'N/A') + '</span><div style="font-size:12px;color:#94a3b8">Avg Time to Response</div></div>' +
+    '</div>';
+
+  // Daily trend bar chart
+  var trend = stats.dailyTrend || [];
+  if (trend.length > 0) {
+    var maxCount = Math.max.apply(null, trend.map(function(d) { return parseInt(d.count); }));
+    document.getElementById('daily-chart').innerHTML = trend.map(function(d) {
+      var h = Math.max(Math.round(parseInt(d.count) / Math.max(maxCount, 1) * 100), 4);
+      var dateLabel = d.date ? d.date.substring(5) : '';
+      return '<div class="bar-col"><span class="bar-value">' + d.count + '</span><div class="bar" style="height:' + h + 'px"></div><span class="bar-label">' + dateLabel + '</span></div>';
+    }).join('');
+  } else {
+    document.getElementById('daily-chart').innerHTML = '<div style="text-align:center;color:#64748b;width:100%;padding:30px">No application data yet. Start applying to see trends!</div>';
+  }
+
+  // Log history
+  document.getElementById('log-history-table').innerHTML = logs.length === 0
+    ? '<tr><td colspan="4" style="text-align:center;color:#64748b;padding:20px">No daily logs yet</td></tr>'
+    : logs.map(function(l) {
+      return '<tr><td>' + esc(l.date) + '</td><td>' + l.applications_sent + '</td><td>' + l.problems_solved + '</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(l.notes) + '</td></tr>';
+    }).join('');
+}
+
 // ============================== APPLICATIONS ==============================
 async function loadApplications() {
   allApps = await api('/api/applications');
+  selectedAppIds.clear();
+  updateBulkBar();
   renderFilters();
   renderAppsTable();
 }
@@ -588,18 +813,89 @@ function renderFilters() {
 
 function setFilter(s) { currentFilter = s; renderFilters(); renderAppsTable(); }
 
-function renderAppsTable() {
+function getFilteredApps() {
   var filtered = currentFilter === 'ALL' ? allApps : allApps.filter(function(a) { return a.status === currentFilter; });
+  var search = (document.getElementById('app-search') ? document.getElementById('app-search').value : '').toLowerCase().trim();
+  if (search) {
+    filtered = filtered.filter(function(a) {
+      return (a.company || '').toLowerCase().includes(search) || (a.role || '').toLowerCase().includes(search);
+    });
+  }
+  return filtered;
+}
+
+function renderAppsTable() {
+  var filtered = getFilteredApps();
+  var selectAll = document.getElementById('select-all-apps');
+  if (selectAll) selectAll.checked = false;
+
   document.getElementById('apps-table').innerHTML = filtered.length === 0
-    ? '<tr><td colspan="9" style="text-align:center;color:#64748b;padding:32px">No applications found</td></tr>'
+    ? '<tr><td colspan="10" style="text-align:center;color:#64748b;padding:32px">No applications found</td></tr>'
     : filtered.map(function(a) {
-      return '<tr><td><strong>' + esc(a.company) + '</strong></td><td>' + esc(a.role) + '</td>' +
+      var checked = selectedAppIds.has(a.id) ? ' checked' : '';
+      return '<tr><td><input type="checkbox" class="app-checkbox" value="' + a.id + '"' + checked + ' onchange="toggleAppSelect(' + a.id + ', this.checked)"></td>' +
+        '<td><strong>' + esc(a.company) + '</strong></td><td>' + esc(a.role) + '</td>' +
         '<td>' + esc(a.platform) + '</td><td>' + esc(a.location) + '</td><td>' + esc(a.salary_range) + '</td>' +
         '<td><span class="badge badge-' + a.status + '">' + a.status + '</span></td>' +
         '<td>' + esc(a.applied_date) + '</td><td>' + esc(a.follow_up_date) + '</td>' +
         '<td><button class="btn btn-sm btn-ghost" onclick="editApp(' + a.id + ')">Edit</button> ' +
         '<button class="btn btn-sm btn-danger" onclick="deleteApp(' + a.id + ')">Del</button></td></tr>';
     }).join('');
+}
+
+function toggleAppSelect(id, checked) {
+  if (checked) selectedAppIds.add(id); else selectedAppIds.delete(id);
+  updateBulkBar();
+}
+
+function toggleSelectAll(checkbox) {
+  var filtered = getFilteredApps();
+  if (checkbox.checked) {
+    filtered.forEach(function(a) { selectedAppIds.add(a.id); });
+  } else {
+    filtered.forEach(function(a) { selectedAppIds.delete(a.id); });
+  }
+  renderAppsTable();
+  updateBulkBar();
+}
+
+function clearBulkSelection() {
+  selectedAppIds.clear();
+  renderAppsTable();
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  var bar = document.getElementById('bulk-action-bar');
+  var count = selectedAppIds.size;
+  if (count > 0) {
+    bar.style.display = 'flex';
+    document.getElementById('bulk-count').textContent = count + ' selected';
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+async function bulkStatusChange() {
+  var status = document.getElementById('bulk-status-select').value;
+  if (!status) return toast('Select a status first', true);
+  if (selectedAppIds.size === 0) return;
+  showConfirm('Bulk Status Change', 'Change ' + selectedAppIds.size + ' applications to ' + status + '?', async function() {
+    await api('/api/applications/bulk-status', 'POST', { ids: Array.from(selectedAppIds), status: status });
+    toast('Updated ' + selectedAppIds.size + ' applications');
+    selectedAppIds.clear();
+    loadApplications();
+  });
+}
+
+async function bulkDeleteApps() {
+  if (selectedAppIds.size === 0) return;
+  showConfirm('Bulk Delete', 'Delete ' + selectedAppIds.size + ' applications? This cannot be undone.', async function() {
+    await api('/api/applications/bulk-delete', 'POST', { ids: Array.from(selectedAppIds) });
+    toast('Deleted ' + selectedAppIds.size + ' applications');
+    selectedAppIds.clear();
+    loadApplications();
+  });
 }
 
 // App CRUD
@@ -661,7 +957,7 @@ async function deleteApp(id) {
   if (document.getElementById('tab-applications').classList.contains('active')) loadApplications();
 }
 
-// ============================== JOB SEARCH ==============================
+// ============================== JOB SEARCH (Multi-Source) ==============================
 function initSearch() {
   updatePortalLinks();
 }
@@ -689,42 +985,58 @@ function updatePortalLinks() {
   }).join('');
 }
 
-// Listen for input changes to update portal links
 document.getElementById('search-keywords').addEventListener('input', updatePortalLinks);
 document.getElementById('search-location').addEventListener('input', updatePortalLinks);
 document.getElementById('search-keywords').addEventListener('keydown', function(e) { if (e.key === 'Enter') searchJobs(); });
 
 async function searchJobs() {
   var kw = document.getElementById('search-keywords').value.trim();
+  var loc = document.getElementById('search-location').value.trim();
   if (!kw) return toast('Enter keywords to search', true);
-  document.getElementById('search-results').innerHTML = '<p style="color:#94a3b8;padding:20px;text-align:center">Searching remote jobs...</p>';
+
+  setLoading('search-btn', true);
+  document.getElementById('search-results').innerHTML = '<div class="loading-overlay"><span class="spinner"></span> Searching across all sources...</div>';
   document.getElementById('search-empty').style.display = 'none';
 
   try {
-    var res = await fetch('https://remotive.com/api/remote-jobs?search=' + encodeURIComponent(kw) + '&limit=25');
-    var data = await res.json();
+    var data = await api('/api/auto/search-jobs?keywords=' + encodeURIComponent(kw) + '&location=' + encodeURIComponent(loc) + '&limit=50');
     var jobs = data.jobs || [];
 
+    // Show sources info
+    var srcInfo = 'Sources: Remotive';
+    if (data.sources.adzuna) srcInfo += ', Adzuna';
+    if (data.sources.jsearch) srcInfo += ', JSearch';
+    if (data.errors && data.errors.length) srcInfo += ' (some errors: ' + data.errors.join(', ') + ')';
+
     if (jobs.length === 0) {
-      document.getElementById('search-results').innerHTML = '<p style="color:#64748b;padding:20px;text-align:center">No remote jobs found for "' + esc(kw) + '". Try the portal links above to search on Indian job sites.</p>';
+      document.getElementById('search-results').innerHTML = '<p style="color:#64748b;padding:20px;text-align:center">No jobs found for "' + esc(kw) + '". Try different keywords or use the portal links above.</p>';
       return;
     }
 
-    document.getElementById('search-results').innerHTML = '<p style="font-size:12px;color:#64748b;margin-bottom:10px">' + jobs.length + ' remote jobs found via Remotive. Use the portal links above for India-specific jobs.</p>' +
+    document.getElementById('search-results').innerHTML =
+      '<p style="font-size:12px;color:#64748b;margin-bottom:10px">' + jobs.length + ' jobs found. ' + srcInfo + '</p>' +
       jobs.map(function(j) {
         var tags = (j.tags || []).slice(0, 5).map(function(t) { return '<span class="badge badge-APPLIED" style="margin-right:4px">' + esc(t) + '</span>'; }).join('');
+        var companyEsc = esc(j.company).replace(/'/g, "\\'");
+        var titleEsc = esc(j.title).replace(/'/g, "\\'");
+        var urlEsc = esc(j.url);
+        var locEsc = esc(j.location || 'Remote').replace(/'/g, "\\'");
+        var salEsc = esc(j.salary || '').replace(/'/g, "\\'");
         return '<div class="job-card">' +
           '<h3>' + esc(j.title) + '</h3>' +
-          '<div class="meta">' + esc(j.company_name) + ' &bull; ' + esc(j.candidate_required_location || 'Remote') + (j.salary ? ' &bull; ' + esc(j.salary) : '') + '</div>' +
+          '<div class="meta">' + esc(j.company) + ' &bull; ' + esc(j.location || 'Remote') + (j.salary ? ' &bull; ' + esc(j.salary) : '') + ' &bull; <span class="badge badge-APPLIED">' + esc(j.source) + '</span></div>' +
           (tags ? '<div style="margin-bottom:8px">' + tags + '</div>' : '') +
           '<div class="actions">' +
-          '<a class="btn btn-sm btn-primary" href="' + esc(j.url) + '" target="_blank">View & Apply</a> ' +
-          '<button class="btn btn-sm btn-success" onclick="saveJobFromSearch(\'' + esc(j.company_name).replace(/'/g, "\\'") + '\',\'' + esc(j.title).replace(/'/g, "\\'") + '\',\'' + esc(j.url) + '\',\'' + esc(j.candidate_required_location || 'Remote').replace(/'/g, "\\'") + '\',\'' + esc(j.salary || '').replace(/'/g, "\\'") + '\')">+ Save to Tracker</button> ' +
-          '<button class="btn btn-sm btn-ghost" onclick="quickApplyFromSearch(\'' + esc(j.company_name).replace(/'/g, "\\'") + '\',\'' + esc(j.title).replace(/'/g, "\\'") + '\',\'' + esc(j.url) + '\')">Quick Apply</button>' +
+          (j.url ? '<a class="btn btn-sm btn-primary" href="' + urlEsc + '" target="_blank">View & Apply</a> ' : '') +
+          '<button class="btn btn-sm btn-success" onclick="saveJobFromSearch(\'' + companyEsc + '\',\'' + titleEsc + '\',\'' + urlEsc + '\',\'' + locEsc + '\',\'' + salEsc + '\')">+ Save to Tracker</button> ' +
+          '<button class="btn btn-sm btn-ghost" onclick="quickApplyFromSearch(\'' + companyEsc + '\',\'' + titleEsc + '\',\'' + urlEsc + '\')">Quick Apply</button>' +
           '</div></div>';
       }).join('');
   } catch (err) {
     document.getElementById('search-results').innerHTML = '<p style="color:#f87171;padding:20px;text-align:center">Search failed: ' + esc(err.message) + '. Use the portal links above instead.</p>';
+  } finally {
+    setLoading('search-btn', false);
+    document.getElementById('search-btn').textContent = 'Search';
   }
 }
 
@@ -825,7 +1137,6 @@ async function sendEmailApply() {
   if (result.error) return toast('Email failed: ' + result.error, true);
   toast('Email sent successfully!');
 
-  // Auto-save to applications
   var company = document.getElementById('qa-company').value.trim();
   var role = document.getElementById('qa-role').value.trim();
   if (company && role) {
@@ -969,6 +1280,26 @@ async function saveEmailConfig() {
   toast('Email config saved');
 }
 
+// Auto-ghost
+async function runAutoGhost() {
+  setLoading('ghost-btn', true);
+  try {
+    var result = await api('/api/auto-ghost', 'POST');
+    if (result.ghosted > 0) {
+      document.getElementById('ghost-result').innerHTML = '<span style="color:#fbbf24">Marked ' + result.ghosted + ' applications as GHOSTED: ' +
+        result.applications.map(function(a) { return esc(a.company); }).join(', ') + '</span>';
+    } else {
+      document.getElementById('ghost-result').innerHTML = '<span style="color:#22c55e">No stale applications found. All good!</span>';
+    }
+    toast(result.ghosted > 0 ? result.ghosted + ' marked as ghosted' : 'No ghosted apps detected');
+  } catch (err) {
+    document.getElementById('ghost-result').textContent = '';
+  } finally {
+    setLoading('ghost-btn', false);
+    document.getElementById('ghost-btn').textContent = 'Detect Ghosted Applications';
+  }
+}
+
 // Templates
 function renderTemplateList() {
   document.getElementById('template-list').innerHTML = allTemplates.length === 0
@@ -1036,11 +1367,12 @@ function importData() {
   reader.onload = async function(e) {
     try {
       var data = JSON.parse(e.target.result);
-      if (!confirm('This will REPLACE all current data. Continue?')) return;
-      var result = await api('/api/import', 'POST', data);
-      if (result.error) return toast('Import failed: ' + result.error, true);
-      toast('Data imported! Refreshing...');
-      setTimeout(function() { location.reload(); }, 1000);
+      showConfirm('Import Data', 'This will REPLACE all current data. Continue?', async function() {
+        var result = await api('/api/import', 'POST', data);
+        if (result.error) return toast('Import failed: ' + result.error, true);
+        toast('Data imported! Refreshing...');
+        setTimeout(function() { location.reload(); }, 1000);
+      });
     } catch (err) {
       toast('Invalid file: ' + err.message, true);
     }
@@ -1049,11 +1381,10 @@ function importData() {
 }
 
 // ============================== AUTOMATION ==============================
-let fetchedJobs = [];
-let queuedJobs = [];
+var fetchedJobs = [];
+var queuedJobs = [];
 
 async function loadAutomation() {
-  // Load stats
   var stats = await api('/api/auto/stats');
   document.getElementById('auto-stats-grid').innerHTML = [
     { num: stats.inQueue, label: 'In Queue', color: '#fbbf24' },
@@ -1064,14 +1395,12 @@ async function loadAutomation() {
     return '<div class="stat-card"><div class="num" style="color:' + c.color + '">' + c.num + '</div><div class="label">' + c.label + '</div></div>';
   }).join('');
 
-  // Load templates
   allTemplates = await api('/api/templates');
   var sel = document.getElementById('auto-template');
   sel.innerHTML = allTemplates.map(function(t) {
     return '<option value="' + t.id + '">' + esc(t.name) + '</option>';
   }).join('');
 
-  // Load queue
   loadAutoQueue();
 }
 
@@ -1081,14 +1410,14 @@ async function autoFetchJobs() {
   var limit = document.getElementById('auto-limit').value || 50;
   if (!kw) return toast('Enter keywords to search', true);
 
-  document.getElementById('auto-fetch-status').innerHTML = '<span style="color:#3b82f6">Fetching jobs from all sources... please wait</span>';
+  setLoading('auto-fetch-btn', true);
+  document.getElementById('auto-fetch-status').innerHTML = '<span class="spinner"></span> <span style="color:#3b82f6">Fetching jobs from all sources... please wait</span>';
   document.getElementById('auto-fetch-results').innerHTML = '';
 
   try {
     var data = await api('/api/auto/search-jobs?keywords=' + encodeURIComponent(kw) + '&location=' + encodeURIComponent(loc) + '&limit=' + limit);
     fetchedJobs = data.jobs;
 
-    // Show sources
     var srcHtml = 'Sources: <span style="color:#22c55e">Remotive (active)</span>';
     if (data.sources.adzuna) srcHtml += ' | <span style="color:#22c55e">Adzuna (active)</span>';
     else srcHtml += ' | <span style="color:#64748b">Adzuna (add ADZUNA_APP_ID + ADZUNA_API_KEY)</span>';
@@ -1120,6 +1449,9 @@ async function autoFetchJobs() {
       }).join('');
   } catch (err) {
     document.getElementById('auto-fetch-status').innerHTML = '<span style="color:#f87171">Error: ' + esc(err.message) + '</span>';
+  } finally {
+    setLoading('auto-fetch-btn', false);
+    document.getElementById('auto-fetch-btn').textContent = 'Fetch Jobs';
   }
 }
 
@@ -1193,37 +1525,43 @@ async function bulkApply() {
 
   var sendEmail = document.getElementById('auto-send-email').checked;
 
-  document.getElementById('bulk-apply-btn').disabled = true;
-  document.getElementById('auto-apply-status').textContent = 'Applying to ' + selectedIds.length + ' jobs... please wait';
+  // Confirmation before bulk apply
+  showConfirm(
+    'Confirm Bulk Apply',
+    'Apply to ' + selectedIds.length + ' jobs' + (sendEmail ? ' and send emails where possible' : '') + '? This will mark them as APPLIED.',
+    async function() {
+      document.getElementById('bulk-apply-btn').disabled = true;
+      document.getElementById('auto-apply-status').innerHTML = '<span class="spinner"></span> Applying to ' + selectedIds.length + ' jobs... please wait';
 
-  try {
-    var result = await api('/api/auto/bulk-apply', 'POST', {
-      job_ids: selectedIds,
-      template_id: parseInt(templateId),
-      send_email: sendEmail
-    });
+      try {
+        var result = await api('/api/auto/bulk-apply', 'POST', {
+          job_ids: selectedIds,
+          template_id: parseInt(templateId),
+          send_email: sendEmail
+        });
 
-    document.getElementById('auto-apply-status').innerHTML = '<span style="color:#22c55e">Done! Applied to ' + result.applied + ' jobs</span>';
+        document.getElementById('auto-apply-status').innerHTML = '<span style="color:#22c55e">Done! Applied to ' + result.applied + ' jobs</span>';
 
-    // Show results log
-    document.getElementById('auto-log-section').style.display = 'block';
-    document.getElementById('auto-apply-log').innerHTML =
-      '<table style="width:100%"><thead><tr><th>Company</th><th>Role</th><th>Email</th><th>Status</th></tr></thead><tbody>' +
-      result.results.map(function(r) {
-        var emailBadge = r.emailStatus === 'sent' ? '<span class="badge badge-INTERVIEW">Sent</span>' :
-                         r.emailStatus === 'skipped' ? '<span class="badge badge-GHOSTED">No email</span>' :
-                         '<span class="badge badge-REJECTED">' + esc(r.emailStatus) + '</span>';
-        return '<tr><td>' + esc(r.company) + '</td><td>' + esc(r.role) + '</td><td>' + emailBadge + '</td><td><span class="badge badge-APPLIED">APPLIED</span></td></tr>';
-      }).join('') + '</tbody></table>';
+        document.getElementById('auto-log-section').style.display = 'block';
+        document.getElementById('auto-apply-log').innerHTML =
+          '<table style="width:100%"><thead><tr><th>Company</th><th>Role</th><th>Email</th><th>Status</th></tr></thead><tbody>' +
+          result.results.map(function(r) {
+            var emailBadge = r.emailStatus === 'sent' ? '<span class="badge badge-INTERVIEW">Sent</span>' :
+                             r.emailStatus === 'skipped' ? '<span class="badge badge-GHOSTED">No email</span>' :
+                             '<span class="badge badge-REJECTED">' + esc(r.emailStatus) + '</span>';
+            return '<tr><td>' + esc(r.company) + '</td><td>' + esc(r.role) + '</td><td>' + emailBadge + '</td><td><span class="badge badge-APPLIED">APPLIED</span></td></tr>';
+          }).join('') + '</tbody></table>';
 
-    toast('Applied to ' + result.applied + ' jobs!');
-    loadAutoQueue();
-    loadAutomation();
-  } catch (err) {
-    document.getElementById('auto-apply-status').innerHTML = '<span style="color:#f87171">Error: ' + esc(err.message) + '</span>';
-  }
+        toast('Applied to ' + result.applied + ' jobs!');
+        loadAutoQueue();
+        loadAutomation();
+      } catch (err) {
+        document.getElementById('auto-apply-status').innerHTML = '<span style="color:#f87171">Error: ' + esc(err.message) + '</span>';
+      }
 
-  document.getElementById('bulk-apply-btn').disabled = false;
+      document.getElementById('bulk-apply-btn').disabled = false;
+    }
+  );
 }
 
 // ============================== INIT ==============================
