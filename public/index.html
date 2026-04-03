@@ -1236,7 +1236,9 @@ async function loadSettings() {
   document.getElementById('s-smtp-pass').value = e.smtp_pass || '';
   document.getElementById('s-from-name').value = e.from_name || '';
 
-  document.getElementById('resume-status').textContent = r.exists ? 'Uploaded: ' + r.filename : 'No resume uploaded';
+  document.getElementById('resume-status').innerHTML = r.exists
+    ? 'Uploaded: ' + esc(r.filename) + ' <a href="/api/resume-download" target="_blank" style="color:#60a5fa;margin-left:8px">Download</a>'
+    : 'No resume uploaded';
 
   renderTemplateList();
 }
@@ -1265,7 +1267,7 @@ async function uploadResume() {
   var res = await fetch('/api/resume', { method: 'POST', body: fd });
   var data = await res.json();
   if (data.error) return toast(data.error, true);
-  document.getElementById('resume-status').textContent = 'Uploaded: ' + data.filename;
+  document.getElementById('resume-status').innerHTML = 'Uploaded: ' + esc(data.filename) + ' <a href="/api/resume-download" target="_blank" style="color:#60a5fa;margin-left:8px">Download</a>';
   toast('Resume uploaded');
 }
 

@@ -9,12 +9,8 @@ const app = express();
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// File upload setup
-const storage = multer.diskStorage({
-  destination: path.join(__dirname, 'uploads'),
-  filename: (req, file, cb) => cb(null, 'resume' + path.extname(file.originalname))
-});
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+// File upload setup (memory storage — resume stored in DB)
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // --- Database Setup (PostgreSQL / Supabase) ---
 const pool = new Pool({
@@ -77,9 +73,15 @@ async function initDB() {
       experience_years TEXT DEFAULT '',
       skills TEXT DEFAULT '',
       summary TEXT DEFAULT '',
-      resume_path TEXT DEFAULT ''
+      resume_path TEXT DEFAULT '',
+      resume_data TEXT DEFAULT '',
+      resume_mimetype TEXT DEFAULT ''
     )
   `);
+
+  // Add resume columns if missing (for existing DBs)
+  await pool.query(`ALTER TABLE profile ADD COLUMN IF NOT EXISTS resume_data TEXT DEFAULT ''`);
+  await pool.query(`ALTER TABLE profile ADD COLUMN IF NOT EXISTS resume_mimetype TEXT DEFAULT ''`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS email_config (
@@ -313,26 +315,40 @@ app.put('/api/profile', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Resume upload
+// Resume upload (stored in DB as base64)
 app.post('/api/resume', upload.single('resume'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file' });
-    await pool.query('UPDATE profile SET resume_path=$1 WHERE id=1', [req.file.filename]);
-    res.json({ ok: true, filename: req.file.filename });
+    const base64 = req.file.buffer.toString('base64');
+    const filename = req.file.originalname;
+    const mimetype = req.file.mimetype;
+    await pool.query(
+      'UPDATE profile SET resume_path=$1, resume_data=$2, resume_mimetype=$3 WHERE id=1',
+      [filename, base64, mimetype]
+    );
+    res.json({ ok: true, filename });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/resume-info', async (req, res) => {
   try {
-    const result = await pool.query('SELECT resume_path FROM profile WHERE id=1');
+    const result = await pool.query('SELECT resume_path, resume_data FROM profile WHERE id=1');
     const p = result.rows[0];
-    if (p && p.resume_path) {
-      const fullPath = path.join(__dirname, 'uploads', p.resume_path);
-      const exists = fs.existsSync(fullPath);
-      res.json({ exists, filename: p.resume_path });
-    } else {
-      res.json({ exists: false, filename: null });
-    }
+    const exists = !!(p && p.resume_path && p.resume_data);
+    res.json({ exists, filename: p ? p.resume_path : null });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Download resume from DB
+app.get('/api/resume-download', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT resume_path, resume_data, resume_mimetype FROM profile WHERE id=1');
+    const p = result.rows[0];
+    if (!p || !p.resume_data) return res.status(404).json({ error: 'No resume uploaded' });
+    const buffer = Buffer.from(p.resume_data, 'base64');
+    res.setHeader('Content-Type', p.resume_mimetype || 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="' + (p.resume_path || 'resume.pdf') + '"');
+    res.send(buffer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -385,13 +401,14 @@ app.post('/api/send-email', async (req, res) => {
     };
 
     if (attachResume) {
-      const profileResult = await pool.query('SELECT resume_path FROM profile WHERE id=1');
+      const profileResult = await pool.query('SELECT resume_path, resume_data, resume_mimetype FROM profile WHERE id=1');
       const profile = profileResult.rows[0];
-      if (profile && profile.resume_path) {
-        const resumePath = path.join(__dirname, 'uploads', profile.resume_path);
-        if (fs.existsSync(resumePath)) {
-          mailOpts.attachments = [{ filename: profile.resume_path, path: resumePath }];
-        }
+      if (profile && profile.resume_data) {
+        mailOpts.attachments = [{
+          filename: profile.resume_path || 'resume.pdf',
+          content: Buffer.from(profile.resume_data, 'base64'),
+          contentType: profile.resume_mimetype || 'application/pdf'
+        }];
       }
     }
 
@@ -759,12 +776,13 @@ app.post('/api/auto/bulk-apply', async (req, res) => {
             text: body
           };
 
-          // Attach resume if available
-          if (profile.resume_path) {
-            const resumePath = path.join(__dirname, 'uploads', profile.resume_path);
-            if (fs.existsSync(resumePath)) {
-              mailOpts.attachments = [{ filename: profile.resume_path, path: resumePath }];
-            }
+          // Attach resume if available (from DB)
+          if (profile.resume_data) {
+            mailOpts.attachments = [{
+              filename: profile.resume_path || 'resume.pdf',
+              content: Buffer.from(profile.resume_data, 'base64'),
+              contentType: profile.resume_mimetype || 'application/pdf'
+            }];
           }
 
           await transporter.sendMail(mailOpts);
