@@ -93,10 +93,16 @@ function setLoading(elId, loading) {
 
 // ============================== DASHBOARD ==============================
 async function loadDashboard() {
-  var data = await Promise.all([api('/api/stats'), api('/api/applications'), api('/api/daily-log')]);
+  var data;
+  try {
+    data = await Promise.all([api('/api/stats'), api('/api/applications'), api('/api/daily-log')]);
+  } catch (e) {
+    document.getElementById('stats-grid').innerHTML = '<div class="stat-card" style="grid-column:1/-1"><div class="label">Could not load dashboard — database may be connecting. Try refreshing in a few seconds.</div></div>';
+    return;
+  }
   var stats = data[0];
-  allApps = data[1];
-  var logs = data[2];
+  allApps = data[1] || [];
+  var logs = data[2] || [];
 
   var banner = document.getElementById('followup-banner');
   if (stats.followUps && stats.followUps.length > 0) {
@@ -159,9 +165,10 @@ async function saveDailyLog() {
 
 // ============================== ANALYTICS ==============================
 async function loadAnalytics() {
-  var data = await Promise.all([api('/api/stats'), api('/api/daily-log')]);
+  var data;
+  try { data = await Promise.all([api('/api/stats'), api('/api/daily-log')]); } catch (e) { return; }
   var stats = data[0];
-  var logs = data[1];
+  var logs = data[1] || [];
 
   var byStatus = {};
   stats.applicationsByStatus.forEach(function(s) { byStatus[s.status] = parseInt(s.count); });
@@ -219,7 +226,7 @@ async function loadAnalytics() {
 
 // ============================== APPLICATIONS ==============================
 async function loadApplications() {
-  allApps = await api('/api/applications');
+  try { allApps = await api('/api/applications'); } catch (e) { allApps = []; }
   selectedAppIds.clear();
   updateBulkBar();
   renderFilters();
@@ -493,7 +500,7 @@ function quickApplyFromSearch(company, role, url) {
 
 // ============================== QUICK APPLY ==============================
 async function loadQuickApply() {
-  allTemplates = await api('/api/templates');
+  try { allTemplates = await api('/api/templates'); } catch (e) { allTemplates = []; }
   var sel = document.getElementById('qa-template');
   sel.innerHTML = allTemplates.map(function(t) {
     return '<option value="' + t.id + '">' + esc(t.name) + '</option>';
@@ -640,7 +647,7 @@ async function sendEmailApply() {
 
 // ============================== INTERVIEW PREP ==============================
 async function loadPrep() {
-  allPrep = await api('/api/prep');
+  try { allPrep = await api('/api/prep'); } catch (e) { allPrep = []; }
   var total = allPrep.length;
   var done = allPrep.filter(function(t) { return t.status === 'DONE'; }).length;
   var pct = total ? Math.round(done / total * 100) : 0;
@@ -788,8 +795,9 @@ function renderResources() {
 
 // ============================== SETTINGS ==============================
 async function loadSettings() {
-  var data = await Promise.all([api('/api/profile'), api('/api/email-config'), api('/api/templates'), api('/api/resume-info'), api('/api/ai/providers')]);
-  var p = data[0]; var e = data[1]; allTemplates = data[2]; var r = data[3]; var aiData = data[4];
+  var data;
+  try { data = await Promise.all([api('/api/profile'), api('/api/email-config'), api('/api/templates'), api('/api/resume-info'), api('/api/ai/providers')]); } catch (e) { return; }
+  var p = data[0] || {}; var e = data[1] || {}; allTemplates = data[2] || []; var r = data[3] || {}; var aiData = data[4] || { providers: [], active: '' };
 
   document.getElementById('s-name').value = p.full_name || '';
   document.getElementById('s-email').value = p.email || '';
@@ -1021,7 +1029,8 @@ function setPreset(keywords, location) {
 }
 
 async function loadAutomation() {
-  var stats = await api('/api/auto/stats');
+  var stats;
+  try { stats = await api('/api/auto/stats'); } catch (e) { stats = { inQueue: 0, appliedToday: 0, totalApplied: 0, interviews: 0 }; }
   document.getElementById('auto-stats-grid').innerHTML = [
     { num: stats.inQueue, label: 'In Queue', color: '#fbbf24' },
     { num: stats.appliedToday, label: 'Applied Today', color: '#3b82f6' },
@@ -1031,7 +1040,7 @@ async function loadAutomation() {
     return '<div class="stat-card"><div class="num" style="color:' + c.color + '">' + c.num + '</div><div class="label">' + c.label + '</div></div>';
   }).join('');
 
-  allTemplates = await api('/api/templates');
+  try { allTemplates = await api('/api/templates'); } catch (e) { allTemplates = []; }
   var sel = document.getElementById('auto-template');
   sel.innerHTML = allTemplates.map(function(t) {
     return '<option value="' + t.id + '">' + esc(t.name) + '</option>';
@@ -1138,7 +1147,7 @@ async function queueSingleJob(index, btn) {
 }
 
 async function loadAutoQueue() {
-  queuedJobs = await api('/api/auto/queue');
+  try { queuedJobs = await api('/api/auto/queue'); } catch (e) { queuedJobs = []; }
 
   // Apply filter if enabled
   var filterEnabled = document.getElementById('auto-filter-enabled');
