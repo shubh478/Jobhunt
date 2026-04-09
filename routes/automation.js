@@ -5,30 +5,34 @@ const nodemailer = require('nodemailer');
 
 // Bulk save jobs to queue
 router.post('/auto/queue-jobs', async (req, res) => {
-  const { jobs } = req.body;
-  if (!jobs || !jobs.length) return res.status(400).json({ error: 'No jobs provided' });
+  try {
+    const { jobs } = req.body;
+    if (!jobs || !jobs.length) return res.status(400).json({ error: 'No jobs provided' });
 
-  let saved = 0;
-  for (const j of jobs) {
-    const existing = await pool.query(
-      'SELECT id FROM applications WHERE LOWER(company)=LOWER($1) AND LOWER(role)=LOWER($2)',
-      [j.company, j.title]
-    );
-    if (existing.rows.length > 0) continue;
+    let saved = 0;
+    for (const j of jobs) {
+      const existing = await pool.query(
+        'SELECT id FROM applications WHERE LOWER(company)=LOWER($1) AND LOWER(role)=LOWER($2)',
+        [j.company, j.title]
+      );
+      if (existing.rows.length > 0) continue;
 
-    await pool.query(
-      `INSERT INTO applications (company, role, platform, portal_url, status, location, salary_range, notes) VALUES ($1,$2,$3,$4,'WISHLIST',$5,$6,$7)`,
-      [j.company, j.title, j.source || 'Auto', j.url || '', j.location || '', j.salary || '', `Auto-fetched from ${j.source}. ${(j.description || '').substring(0, 200)}`]
-    );
-    saved++;
-  }
-  res.json({ ok: true, saved, skipped: jobs.length - saved });
+      await pool.query(
+        `INSERT INTO applications (company, role, platform, portal_url, status, location, salary_range, notes) VALUES ($1,$2,$3,$4,'WISHLIST',$5,$6,$7)`,
+        [j.company, j.title, j.source || 'Auto', j.url || '', j.location || '', j.salary || '', `Auto-fetched from ${j.source}. ${(j.description || '').substring(0, 200)}`]
+      );
+      saved++;
+    }
+    res.json({ ok: true, saved, skipped: jobs.length - saved });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Get queued jobs
 router.get('/auto/queue', async (req, res) => {
-  const result = await pool.query("SELECT * FROM applications WHERE status='WISHLIST' ORDER BY created_at DESC");
-  res.json(result.rows);
+  try {
+    const result = await pool.query("SELECT * FROM applications WHERE status='WISHLIST' ORDER BY created_at DESC");
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Bulk apply

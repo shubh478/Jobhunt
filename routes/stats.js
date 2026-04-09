@@ -64,19 +64,21 @@ router.post('/daily-log', async (req, res) => {
 
 // Export/Import
 router.get('/export', async (req, res) => {
-  const applications = await pool.query('SELECT * FROM applications');
-  const prep = await pool.query('SELECT * FROM prep_topics');
-  const profile = await pool.query('SELECT * FROM profile WHERE id=1');
-  const templates = await pool.query('SELECT * FROM cover_templates');
-  const data = {
-    applications: applications.rows,
-    prep_topics: prep.rows,
-    profile: profile.rows[0],
-    cover_templates: templates.rows,
-    exported_at: new Date().toISOString()
-  };
-  res.setHeader('Content-Disposition', 'attachment; filename=jobhunt-backup.json');
-  res.json(data);
+  try {
+    const applications = await pool.query('SELECT * FROM applications');
+    const prep = await pool.query('SELECT * FROM prep_topics');
+    const profile = await pool.query('SELECT * FROM profile WHERE id=1');
+    const templates = await pool.query('SELECT * FROM cover_templates');
+    const data = {
+      applications: applications.rows,
+      prep_topics: prep.rows,
+      profile: profile.rows[0],
+      cover_templates: templates.rows,
+      exported_at: new Date().toISOString()
+    };
+    res.setHeader('Content-Disposition', 'attachment; filename=jobhunt-backup.json');
+    res.json(data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.post('/import', async (req, res) => {

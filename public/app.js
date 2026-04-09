@@ -35,10 +35,24 @@ async function api(url, method, body) {
   method = method || 'GET';
   var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
-  var res = await fetch(url, opts);
-  var data = await res.json();
-  if (data.error && !res.ok) { toast(data.error, true); throw new Error(data.error); }
-  return data;
+  try {
+    var res = await fetch(url, opts);
+    var text = await res.text();
+    var data;
+    try { data = JSON.parse(text); } catch (e) {
+      console.error('Invalid JSON from', url, ':', text.substring(0, 200));
+      toast('Server error — please try again', true);
+      throw new Error('Invalid response from server');
+    }
+    if (data.error && !res.ok) { toast(data.error, true); throw new Error(data.error); }
+    return data;
+  } catch (e) {
+    if (e.message === 'Invalid response from server') throw e;
+    if (e.message && e.message.includes('Failed to fetch')) {
+      toast('Cannot reach server — check your connection', true);
+    }
+    throw e;
+  }
 }
 
 function esc(s) {
@@ -874,11 +888,15 @@ async function uploadResume() {
   if (!input.files || !input.files[0]) return toast('Select a file', true);
   var fd = new FormData();
   fd.append('resume', input.files[0]);
-  var res = await fetch('/api/resume', { method: 'POST', body: fd });
-  var data = await res.json();
-  if (data.error) return toast(data.error, true);
-  document.getElementById('resume-status').innerHTML = 'Uploaded: ' + esc(data.filename) + ' <a href="/api/resume-download" target="_blank" style="color:#60a5fa;margin-left:8px">Download</a>';
-  toast('Resume uploaded');
+  try {
+    var res = await fetch('/api/resume', { method: 'POST', body: fd });
+    var text = await res.text();
+    var data;
+    try { data = JSON.parse(text); } catch (e) { return toast('Upload failed — server error', true); }
+    if (data.error) return toast(data.error, true);
+    document.getElementById('resume-status').innerHTML = 'Uploaded: ' + esc(data.filename) + ' <a href="/api/resume-download" target="_blank" style="color:#60a5fa;margin-left:8px">Download</a>';
+    toast('Resume uploaded');
+  } catch (e) { toast('Upload failed: ' + e.message, true); }
 }
 
 async function saveEmailConfig() {
