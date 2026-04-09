@@ -415,10 +415,11 @@ async function searchJobs() {
     var data = await api('/api/auto/search-jobs?keywords=' + encodeURIComponent(kw) + '&location=' + encodeURIComponent(loc) + '&limit=50');
     var jobs = data.jobs || [];
 
-    var srcInfo = 'Sources: Remotive';
+    var srcInfo = 'Sources: Remotive, RemoteOK, Jobicy';
     if (data.sources.adzuna) srcInfo += ', Adzuna';
-    if (data.sources.jsearch) srcInfo += ', JSearch';
-    if (data.errors && data.errors.length) srcInfo += ' (some errors: ' + data.errors.join(', ') + ')';
+    if (data.sources.jsearch) srcInfo += ', JSearch (Google Jobs)';
+    if (data.totalBeforeDedup && data.totalBeforeDedup > data.total) srcInfo += ' (' + (data.totalBeforeDedup - data.total) + ' duplicates removed)';
+    if (data.errors && data.errors.length) srcInfo += ' | Errors: ' + data.errors.join(', ');
 
     if (jobs.length === 0) {
       document.getElementById('search-results').innerHTML = '<p style="color:#64748b;padding:20px;text-align:center">No jobs found for "' + esc(kw) + '". Try different keywords or use the portal links above.</p>';
@@ -995,6 +996,12 @@ function importData() {
 var fetchedJobs = [];
 var queuedJobs = [];
 
+function setPreset(keywords, location) {
+  document.getElementById('auto-keywords').value = keywords;
+  document.getElementById('auto-location').value = location;
+  toast('Preset loaded: ' + keywords + ' in ' + location);
+}
+
 async function loadAutomation() {
   var stats = await api('/api/auto/stats');
   document.getElementById('auto-stats-grid').innerHTML = [
@@ -1018,52 +1025,75 @@ async function loadAutomation() {
 async function autoFetchJobs() {
   var kw = document.getElementById('auto-keywords').value.trim();
   var loc = document.getElementById('auto-location').value.trim();
-  var limit = document.getElementById('auto-limit').value || 50;
+  var limit = document.getElementById('auto-limit').value || 100;
   if (!kw) return toast('Enter keywords to search', true);
 
   setLoading('auto-fetch-btn', true);
-  document.getElementById('auto-fetch-status').innerHTML = '<span class="spinner"></span> <span style="color:#3b82f6">Fetching jobs from all sources... please wait</span>';
+  document.getElementById('auto-fetch-status').innerHTML = '<span class="spinner"></span> <span style="color:#3b82f6">Fetching jobs from 5 sources in parallel... please wait</span>';
   document.getElementById('auto-fetch-results').innerHTML = '';
 
   try {
     var data = await api('/api/auto/search-jobs?keywords=' + encodeURIComponent(kw) + '&location=' + encodeURIComponent(loc) + '&limit=' + limit);
     fetchedJobs = data.jobs;
 
-    var srcHtml = 'Sources: <span style="color:#22c55e">Remotive (active)</span>';
-    if (data.sources.adzuna) srcHtml += ' | <span style="color:#22c55e">Adzuna (active)</span>';
-    else srcHtml += ' | <span style="color:#64748b">Adzuna (add ADZUNA_APP_ID + ADZUNA_API_KEY)</span>';
-    if (data.sources.jsearch) srcHtml += ' | <span style="color:#22c55e">JSearch (active)</span>';
-    else srcHtml += ' | <span style="color:#64748b">JSearch (add RAPIDAPI_KEY)</span>';
+    // Build source status display
+    var sourceNames = ['Remotive', 'Adzuna', 'JSearch', 'RemoteOK', 'Jobicy'];
+    var sourceKeys = ['remotive', 'adzuna', 'jsearch', 'remoteok', 'jobicy'];
+    var srcHtml = 'Sources: ' + sourceNames.map(function(name, i) {
+      var active = data.sources[sourceKeys[i]];
+      return '<span style="color:' + (active ? '#22c55e' : '#64748b') + '">' + name + (active ? '' : ' (off)') + '</span>';
+    }).join(' | ');
+    if (data.totalBeforeDedup && data.totalBeforeDedup > data.total) {
+      srcHtml += ' | <span style="color:#fbbf24">' + (data.totalBeforeDedup - data.total) + ' duplicates removed</span>';
+    }
     document.getElementById('auto-sources').innerHTML = srcHtml;
 
-    if (data.errors.length > 0) {
-      document.getElementById('auto-fetch-status').innerHTML = '<span style="color:#fbbf24">Found ' + fetchedJobs.length + ' jobs (some sources had errors: ' + esc(data.errors.join(', ')) + ')</span>';
+    if (data.errors && data.errors.length > 0) {
+      document.getElementById('auto-fetch-status').innerHTML = '<span style="color:#fbbf24">Found ' + fetchedJobs.length + ' unique jobs (some errors: ' + esc(data.errors.join(', ')) + ')</span>';
     } else {
-      document.getElementById('auto-fetch-status').innerHTML = '<span style="color:#22c55e">Found ' + fetchedJobs.length + ' jobs across all sources!</span>';
+      document.getElementById('auto-fetch-status').innerHTML = '<span style="color:#22c55e">Found ' + fetchedJobs.length + ' unique jobs across all sources!</span>';
     }
 
     if (fetchedJobs.length === 0) {
-      document.getElementById('auto-fetch-results').innerHTML = '<p style="color:#64748b;padding:20px;text-align:center">No jobs found. Try different keywords.</p>';
+      document.getElementById('auto-fetch-results').innerHTML = '<p style="color:#64748b;padding:20px;text-align:center">No jobs found. Try different keywords or presets.</p>';
       return;
     }
 
-    document.getElementById('auto-fetch-results').innerHTML =
-      '<div style="display:flex;gap:8px;margin:12px 0;align-items:center">' +
-      '<button class="btn btn-success" onclick="queueAllFetched()">Add All ' + fetchedJobs.length + ' to Queue</button>' +
-      '<span style="font-size:12px;color:#94a3b8">Or click individual jobs to add them</span></div>' +
-      fetchedJobs.map(function(j, i) {
-        return '<div class="job-card" style="padding:12px">' +
-          '<div style="display:flex;justify-content:space-between;align-items:start">' +
-          '<div><strong>' + esc(j.title) + '</strong><div class="meta">' + esc(j.company) + ' &bull; ' + esc(j.location) + (j.salary ? ' &bull; ' + esc(j.salary) : '') + ' &bull; <span class="badge badge-APPLIED">' + esc(j.source) + '</span></div></div>' +
-          '<button class="btn btn-sm btn-success" onclick="queueSingleJob(' + i + ', this)">+ Queue</button>' +
-          '</div></div>';
-      }).join('');
+    renderFetchedJobs();
+
+    // Auto-score if enabled
+    var autoScore = document.getElementById('auto-score-on-fetch');
+    if (autoScore && autoScore.checked) {
+      toast('Auto-queuing and scoring jobs...');
+      await queueAllFetched();
+      await scoreQueuedJobs();
+    }
   } catch (err) {
     document.getElementById('auto-fetch-status').innerHTML = '<span style="color:#f87171">Error: ' + esc(err.message) + '</span>';
   } finally {
     setLoading('auto-fetch-btn', false);
     document.getElementById('auto-fetch-btn').textContent = 'Fetch Jobs';
   }
+}
+
+function renderFetchedJobs() {
+  document.getElementById('auto-fetch-results').innerHTML =
+    '<div style="display:flex;gap:8px;margin:12px 0;align-items:center">' +
+    '<button class="btn btn-success" onclick="queueAllFetched()">Add All ' + fetchedJobs.length + ' to Queue</button>' +
+    '<span style="font-size:12px;color:#94a3b8">Or click individual jobs to add them</span></div>' +
+    fetchedJobs.map(function(j, i) {
+      var sourceBadge = j.source === 'JSearch' ? 'badge-INTERVIEW' :
+                        j.source === 'Adzuna' ? 'badge-APPLIED' :
+                        j.source === 'RemoteOK' ? 'badge-SCREENING' :
+                        j.source === 'Jobicy' ? 'badge-OFFER' : 'badge-APPLIED';
+      return '<div class="job-card" style="padding:12px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:start">' +
+        '<div style="flex:1"><strong>' + esc(j.title) + '</strong><div class="meta">' + esc(j.company) + ' &bull; ' + esc(j.location) + (j.salary ? ' &bull; ' + esc(j.salary) : '') + ' &bull; <span class="badge ' + sourceBadge + '">' + esc(j.source) + '</span></div>' +
+        (j.description ? '<div style="font-size:11px;color:#64748b;margin-top:4px">' + esc(j.description.substring(0, 150)) + '...</div>' : '') +
+        '</div>' +
+        '<button class="btn btn-sm btn-success" onclick="queueSingleJob(' + i + ', this)">+ Queue</button>' +
+        '</div></div>';
+    }).join('');
 }
 
 async function queueAllFetched() {
@@ -1091,20 +1121,48 @@ async function queueSingleJob(index, btn) {
 
 async function loadAutoQueue() {
   queuedJobs = await api('/api/auto/queue');
-  document.getElementById('auto-queue-count').textContent = queuedJobs.length + ' jobs in queue';
 
-  if (queuedJobs.length === 0) {
-    document.getElementById('auto-queue-list').innerHTML = '<p style="color:#64748b;padding:20px;text-align:center">Queue is empty. Fetch jobs first (Step 1) to add them here.</p>';
+  // Apply filter if enabled
+  var filterEnabled = document.getElementById('auto-filter-enabled');
+  var minScoreEl = document.getElementById('auto-min-score');
+  var minScore = (minScoreEl ? parseInt(minScoreEl.value) : 0) || 0;
+  var displayJobs = queuedJobs;
+  var filteredOut = 0;
+
+  if (filterEnabled && filterEnabled.checked && minScore > 0) {
+    displayJobs = queuedJobs.filter(function(j) {
+      if (j.match_score === null || j.match_score === undefined) return true; // show unscored
+      if (j.match_score >= minScore) return true;
+      filteredOut++;
+      return false;
+    });
+  }
+
+  var countText = displayJobs.length + ' jobs in queue';
+  if (filteredOut > 0) countText += ' (' + filteredOut + ' hidden below ' + minScore + '% match)';
+  document.getElementById('auto-queue-count').textContent = countText;
+
+  if (displayJobs.length === 0) {
+    document.getElementById('auto-queue-list').innerHTML = '<p style="color:#64748b;padding:20px;text-align:center">' +
+      (filteredOut > 0 ? 'All ' + filteredOut + ' jobs are below ' + minScore + '% match. Try lowering the threshold or fetching with different keywords.' : 'Queue is empty. Fetch jobs first (Step 1) to add them here.') + '</p>';
     return;
   }
 
-  document.getElementById('auto-queue-list').innerHTML = queuedJobs.map(function(j) {
+  // Sort by match_score descending (highest first), unscored at bottom
+  displayJobs.sort(function(a, b) {
+    var sa = a.match_score !== null && a.match_score !== undefined ? a.match_score : -1;
+    var sb = b.match_score !== null && b.match_score !== undefined ? b.match_score : -1;
+    return sb - sa;
+  });
+
+  document.getElementById('auto-queue-list').innerHTML = displayJobs.map(function(j) {
     var scoreBadge = j.match_score !== null && j.match_score !== undefined
       ? '<span class="badge" style="background:' + (j.match_score >= 70 ? '#14532d' : j.match_score >= 40 ? '#422006' : '#450a0a') +
-        ';color:' + (j.match_score >= 70 ? '#4ade80' : j.match_score >= 40 ? '#fbbf24' : '#f87171') + '">' + j.match_score + '%</span>'
-      : '';
+        ';color:' + (j.match_score >= 70 ? '#4ade80' : j.match_score >= 40 ? '#fbbf24' : '#f87171') + ';font-size:12px">' + j.match_score + '%</span>'
+      : '<span style="color:#64748b;font-size:10px">unscored</span>';
+    var checked = (j.match_score === null || j.match_score === undefined || j.match_score >= 50) ? ' checked' : '';
     return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid #334155">' +
-      '<input type="checkbox" class="queue-checkbox" value="' + j.id + '" checked>' +
+      '<input type="checkbox" class="queue-checkbox" value="' + j.id + '"' + checked + '>' +
       '<div style="flex:1"><strong style="font-size:13px">' + esc(j.company) + '</strong> — ' + esc(j.role) +
       '<div style="font-size:11px;color:#64748b">' + esc(j.location) + (j.salary_range ? ' | ' + esc(j.salary_range) : '') + ' | ' + esc(j.platform) + '</div></div>' +
       scoreBadge +

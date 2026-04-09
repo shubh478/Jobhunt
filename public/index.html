@@ -257,16 +257,39 @@
 
     <!-- Step 1: Fetch Jobs -->
     <div class="settings-section">
-      <h3>Step 1: Fetch Jobs from Multiple Sources</h3>
-      <p style="font-size:12px;color:#64748b;margin-bottom:10px">Search across Remotive (free), Adzuna, and JSearch. Add API keys in Render env vars for more sources.</p>
+      <h3>Step 1: Fetch Jobs from 5 Sources</h3>
+      <p style="font-size:12px;color:#64748b;margin-bottom:10px">Search across Remotive, Adzuna (India), JSearch (Google Jobs = LinkedIn+Naukri+Indeed), RemoteOK, and Jobicy. All in parallel!</p>
+
+      <!-- Smart Presets -->
+      <div style="margin-bottom:12px">
+        <label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Quick Presets (click to auto-fill):</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-sm btn-ghost" onclick="setPreset('Java Spring Boot Developer','India')" style="border-color:#22c55e;color:#4ade80">Java Spring Boot</button>
+          <button class="btn btn-sm btn-ghost" onclick="setPreset('Full Stack Developer','India')" style="border-color:#3b82f6;color:#60a5fa">Full Stack</button>
+          <button class="btn btn-sm btn-ghost" onclick="setPreset('React Angular Frontend Developer','India')" style="border-color:#a78bfa;color:#c4b5fd">Frontend React/Angular</button>
+          <button class="btn btn-sm btn-ghost" onclick="setPreset('Node.js Backend Developer','India')" style="border-color:#fbbf24;color:#fde68a">Node.js Backend</button>
+          <button class="btn btn-sm btn-ghost" onclick="setPreset('Software Engineer SDE','Hyderabad')" style="border-color:#f472b6;color:#fbcfe8">SDE Hyderabad</button>
+          <button class="btn btn-sm btn-ghost" onclick="setPreset('Software Engineer SDE','Bangalore')" style="border-color:#34d399;color:#a7f3d0">SDE Bangalore</button>
+          <button class="btn btn-sm btn-ghost" onclick="setPreset('Microservices Java Developer','Remote')" style="border-color:#fb923c;color:#fed7aa">Microservices Remote</button>
+        </div>
+      </div>
+
       <div class="search-bar">
         <input id="auto-keywords" placeholder="Keywords (e.g. Java Developer, React, SDE)">
-        <input id="auto-location" placeholder="Location (e.g. India, Remote)" style="max-width:200px">
-        <input id="auto-limit" type="number" value="50" min="10" max="100" placeholder="Max" style="max-width:80px" title="Max results">
+        <input id="auto-location" placeholder="Location (e.g. India, Remote)" value="India" style="max-width:200px">
+        <input id="auto-limit" type="number" value="100" min="10" max="200" placeholder="Max" style="max-width:80px" title="Max results">
         <button class="btn btn-primary" onclick="autoFetchJobs()" id="auto-fetch-btn">Fetch Jobs</button>
       </div>
+
+      <!-- Auto-filter controls -->
+      <div style="display:flex;gap:12px;align-items:center;margin:10px 0;flex-wrap:wrap">
+        <label style="font-size:12px;color:#94a3b8"><input type="checkbox" id="auto-score-on-fetch" checked> Auto-score after fetch (AI)</label>
+        <label style="font-size:12px;color:#94a3b8">Min match score: <input type="number" id="auto-min-score" value="50" min="0" max="100" style="width:55px;padding:3px 6px;background:#0f172a;border:1px solid #334155;border-radius:4px;color:#e2e8f0;font-size:12px">%</label>
+        <label style="font-size:12px;color:#94a3b8"><input type="checkbox" id="auto-filter-enabled" checked> Hide low-match jobs</label>
+      </div>
+
       <div id="auto-sources" style="font-size:11px;color:#64748b;margin-bottom:8px"></div>
-      <div id="auto-fetch-status" style="font-size:13px;color:#94a3b8;padding:10px;text-align:center">Click "Fetch Jobs" to find relevant jobs automatically</div>
+      <div id="auto-fetch-status" style="font-size:13px;color:#94a3b8;padding:10px;text-align:center">Click a preset or enter keywords to find relevant jobs automatically</div>
       <div id="auto-fetch-results"></div>
     </div>
 
