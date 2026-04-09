@@ -23,10 +23,12 @@ app.get('/', (req, res) => {
 
 const PORT = process.env.PORT || 3456;
 initDB().then(() => {
+  console.log('DB connected successfully');
+}).catch(err => {
+  console.error('DB init failed:', err.message);
+  console.log('Server will start anyway - DB features may not work');
+}).finally(() => {
   app.listen(PORT, () => {
     console.log('Job Hunt Pro running at http://localhost:' + PORT);
   });
-}).catch(err => {
-  console.error('DB init failed:', err);
-  process.exit(1);
 });
