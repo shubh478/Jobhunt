@@ -21,6 +21,7 @@ function switchTab(name) {
   if (name === 'quickapply') loadQuickApply();
   if (name === 'settings') loadSettings();
   if (name === 'search') initSearch();
+  if (name === 'study') loadStudyTopics();
 }
 
 // ============================== UTILS ==============================
@@ -771,6 +772,127 @@ async function cyclePracticeStatus(id, current) {
   await api('/api/practice-questions/' + id, 'PUT', { status: next });
   var appId = document.getElementById('prep-app-select').value;
   if (appId) loadSavedQuestions();
+}
+
+// ============================== STUDY MATERIALS ==============================
+var studyTopics = [
+  { folder: '01-Java-Core', name: 'Java Core', icon: '\u2615', desc: 'OOPs, Collections, Streams, Multithreading, JVM' },
+  { folder: '02-Spring-Boot', name: 'Spring Boot', icon: '\uD83C\uDF31', desc: 'Spring Core, Boot, Security, Data JPA, Cloud' },
+  { folder: '03-DSA', name: 'DSA', icon: '\uD83E\udDE9', desc: 'Arrays, Trees, Graphs, DP, Top 30 LeetCode' },
+  { folder: '04-System-Design', name: 'System Design', icon: '\uD83C\uDFD7\uFE0F', desc: 'HLD, LLD, Design Patterns, Scalability' },
+  { folder: '05-Database', name: 'Database', icon: '\uD83D\uDDC4\uFE0F', desc: 'MySQL, PostgreSQL, MongoDB, Indexing' },
+  { folder: '06-Redis-Caching', name: 'Redis & Caching', icon: '\u26A1', desc: 'Redis, Ehcache, Caching Strategies' },
+  { folder: '07-Messaging-Queues', name: 'Messaging Queues', icon: '\uD83D\uDCE8', desc: 'Kafka, RabbitMQ, Event-Driven Architecture' },
+  { folder: '08-Operating-System', name: 'Operating System', icon: '\uD83D\uDDA5\uFE0F', desc: 'Process, Threads, Memory, Deadlocks' },
+  { folder: '09-Networking', name: 'Networking', icon: '\uD83C\uDF10', desc: 'TCP/IP, HTTP, DNS, REST, WebSockets' },
+  { folder: '10-DevOps-Cloud', name: 'DevOps & Cloud', icon: '\u2601\uFE0F', desc: 'Docker, Kubernetes, AWS, CI/CD' },
+  { folder: '11-OOPs-Design-Patterns', name: 'OOPs & Patterns', icon: '\uD83D\uDD27', desc: 'SOLID, GoF Patterns, Real-World Examples' },
+  { folder: '12-Behavioral', name: 'Behavioral & HR', icon: '\uD83C\uDFAF', desc: 'STAR Method, Questions, Salary Negotiation' }
+];
+
+var studyCache = {};
+
+function loadStudyTopics() {
+  var grid = document.getElementById('study-topics-grid');
+  grid.style.display = '';
+  document.getElementById('study-content-viewer').style.display = 'none';
+  grid.innerHTML = studyTopics.map(function(t) {
+    return '<div class="card study-card" onclick="openStudyTopic(\'' + t.folder + '\', \'' + esc(t.name) + '\')">' +
+      '<div class="topic-icon">' + t.icon + '</div>' +
+      '<h3>' + esc(t.name) + '</h3>' +
+      '<p>' + esc(t.desc) + '</p>' +
+      '</div>';
+  }).join('');
+}
+
+async function openStudyTopic(folder, name) {
+  document.getElementById('study-topics-grid').style.display = 'none';
+  var viewer = document.getElementById('study-content-viewer');
+  viewer.style.display = '';
+  document.getElementById('study-content-title').textContent = name;
+  document.getElementById('study-content-body').innerHTML = '<div class="loading-overlay"><div class="spinner"></div> Loading ' + name + '...</div>';
+
+  if (studyCache[folder]) {
+    document.getElementById('study-content-body').innerHTML = renderMarkdown(studyCache[folder]);
+    return;
+  }
+
+  try {
+    var url = 'https://raw.githubusercontent.com/shubh478/Interview-Preparation/main/' + folder + '/README.md';
+    var res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to fetch');
+    var md = await res.text();
+    studyCache[folder] = md;
+    document.getElementById('study-content-body').innerHTML = renderMarkdown(md);
+  } catch (e) {
+    document.getElementById('study-content-body').innerHTML = '<p style="color:#f87171">Could not load content. <a href="https://github.com/shubh478/Interview-Preparation/tree/main/' + folder + '" target="_blank">View on GitHub</a></p>';
+  }
+}
+
+function closeStudyViewer() {
+  document.getElementById('study-content-viewer').style.display = 'none';
+  document.getElementById('study-topics-grid').style.display = '';
+}
+
+function renderMarkdown(md) {
+  // Simple markdown to HTML renderer
+  var html = md;
+
+  // Code blocks (```lang ... ```)
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, function(m, lang, code) {
+    return '<pre><code class="language-' + lang + '">' + escHtml(code.trim()) + '</code></pre>';
+  });
+
+  // Inline code
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+  // Tables
+  html = html.replace(/^(\|.+\|)\n(\|[-| :]+\|)\n((?:\|.+\|\n?)*)/gm, function(m, header, sep, rows) {
+    var ths = header.split('|').filter(function(c) { return c.trim(); }).map(function(c) { return '<th>' + c.trim() + '</th>'; }).join('');
+    var trs = rows.trim().split('\n').map(function(row) {
+      var tds = row.split('|').filter(function(c) { return c.trim(); }).map(function(c) { return '<td>' + c.trim() + '</td>'; }).join('');
+      return '<tr>' + tds + '</tr>';
+    }).join('');
+    return '<table><thead><tr>' + ths + '</tr></thead><tbody>' + trs + '</tbody></table>';
+  });
+
+  // Headers
+  html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+  // Horizontal rule
+  html = html.replace(/^---$/gm, '<hr>');
+
+  // Bold and italic
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+  // Unordered lists
+  html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
+
+  // Ordered lists
+  html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+
+  // Links
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+
+  // Blockquotes
+  html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+
+  // Paragraphs — wrap loose text lines
+  html = html.replace(/^(?!<[a-z/]|$)(.+)$/gm, '<p>$1</p>');
+
+  // Clean up extra blank lines
+  html = html.replace(/\n{3,}/g, '\n\n');
+
+  return html;
+}
+
+function escHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 // ============================== RESOURCES ==============================

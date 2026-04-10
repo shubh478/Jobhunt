@@ -172,6 +172,39 @@
   .log-cell { aspect-ratio: 1; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; cursor: pointer; transition: all .2s; }
   .log-cell:hover { transform: scale(1.1); }
 
+  /* Study Materials */
+  .study-card { cursor: pointer; position: relative; overflow: hidden; }
+  .study-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 14px 14px 0 0; }
+  .study-card:nth-child(1)::before { background: linear-gradient(90deg, #6366f1, #818cf8); }
+  .study-card:nth-child(2)::before { background: linear-gradient(90deg, #22c55e, #4ade80); }
+  .study-card:nth-child(3)::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+  .study-card:nth-child(4)::before { background: linear-gradient(90deg, #ef4444, #f87171); }
+  .study-card:nth-child(5)::before { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+  .study-card:nth-child(6)::before { background: linear-gradient(90deg, #ec4899, #f472b6); }
+  .study-card:nth-child(7)::before { background: linear-gradient(90deg, #14b8a6, #2dd4bf); }
+  .study-card:nth-child(8)::before { background: linear-gradient(90deg, #f97316, #fb923c); }
+  .study-card:nth-child(9)::before { background: linear-gradient(90deg, #06b6d4, #22d3ee); }
+  .study-card:nth-child(10)::before { background: linear-gradient(90deg, #84cc16, #a3e635); }
+  .study-card:nth-child(11)::before { background: linear-gradient(90deg, #e879f9, #d946ef); }
+  .study-card:nth-child(12)::before { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+  .study-card .topic-icon { font-size: 28px; margin-bottom: 8px; }
+  #study-content-body h1 { font-size: 22px; font-weight: 800; margin: 24px 0 12px; color: #818cf8; }
+  #study-content-body h2 { font-size: 18px; font-weight: 700; margin: 20px 0 10px; color: #a5b4fc; border-bottom: 1px solid rgba(63,63,70,.4); padding-bottom: 6px; }
+  #study-content-body h3 { font-size: 15px; font-weight: 700; margin: 16px 0 8px; color: #c4b5fd; }
+  #study-content-body p { margin: 6px 0; color: #d4d4d8; }
+  #study-content-body pre { background: rgba(9,9,11,.8); border: 1px solid rgba(63,63,70,.4); border-radius: 10px; padding: 14px; margin: 10px 0; overflow-x: auto; font-size: 13px; line-height: 1.6; }
+  #study-content-body code { font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 13px; color: #a5b4fc; }
+  #study-content-body pre code { color: #d4d4d8; }
+  #study-content-body table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+  #study-content-body th { background: rgba(99,102,241,.1); padding: 8px 12px; text-align: left; font-size: 12px; border: 1px solid rgba(63,63,70,.4); color: #a5b4fc; }
+  #study-content-body td { padding: 8px 12px; border: 1px solid rgba(63,63,70,.3); font-size: 13px; }
+  #study-content-body tr:hover { background: rgba(39,39,42,.5); }
+  #study-content-body ul, #study-content-body ol { margin: 6px 0 6px 20px; }
+  #study-content-body li { margin: 4px 0; color: #d4d4d8; }
+  #study-content-body strong { color: #fafafa; }
+  #study-content-body hr { border: none; border-top: 1px solid rgba(63,63,70,.5); margin: 20px 0; }
+  #study-content-body blockquote { border-left: 3px solid #818cf8; padding: 8px 16px; margin: 10px 0; background: rgba(99,102,241,.05); border-radius: 0 8px 8px 0; }
+
   @media (max-width: 640px) {
     .form-row { grid-template-columns: 1fr; }
     .stats-grid { grid-template-columns: repeat(3, 1fr); }
@@ -191,6 +224,7 @@
   <button class="nav-btn" onclick="switchTab('applications')">Applications</button>
   <button class="nav-btn" onclick="switchTab('quickapply')">Quick Apply</button>
   <button class="nav-btn" onclick="switchTab('prep')">Prep</button>
+  <button class="nav-btn" onclick="switchTab('study')">Study Materials</button>
   <button class="nav-btn" onclick="switchTab('resources')">Resources</button>
   <button class="nav-btn" onclick="switchTab('settings')">Settings</button>
 </nav>
@@ -460,6 +494,23 @@
     <div class="progress-label" id="prep-progress-label"></div>
     <div class="progress-bar"><div class="progress-fill" id="prep-progress-fill"></div></div>
     <div id="prep-list"></div>
+  </div>
+
+  <!-- ==================== STUDY MATERIALS ==================== -->
+  <div id="tab-study" class="tab">
+    <div class="section-header">
+      <h2>Study Materials</h2>
+      <a href="https://github.com/shubh478/Interview-Preparation" target="_blank" class="btn btn-ghost" style="font-size:12px">View on GitHub</a>
+    </div>
+    <p style="font-size:13px;color:#71717a;margin-bottom:18px">Complete interview prep — Java, Spring Boot, DSA, System Design & more. Click a topic to study.</p>
+    <div class="card-grid" id="study-topics-grid"></div>
+    <div id="study-content-viewer" style="display:none;margin-top:24px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+        <button class="btn btn-ghost btn-sm" onclick="closeStudyViewer()">Back to Topics</button>
+        <h2 id="study-content-title" style="font-size:18px;font-weight:700"></h2>
+      </div>
+      <div id="study-content-body" class="settings-section" style="font-size:14px;line-height:1.8;overflow-x:auto"></div>
+    </div>
   </div>
 
   <!-- ==================== RESOURCES ==================== -->
