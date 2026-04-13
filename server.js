@@ -8,7 +8,8 @@ const app = express();
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 app.use(attachUser);
-app.use(express.static(path.join(__dirname, 'public')));
+// index: false so GET / hits our handler (which redirects unauth users to /login.html)
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 // Auth routes are public
 app.use('/api', require('./routes/auth'));

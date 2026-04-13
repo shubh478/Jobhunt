@@ -109,46 +109,105 @@ router.post('/import/resume', upload.single('resume'), async (req, res) => {
 });
 
 // POST /api/import/github — fetch top languages and recent repos for a username
+async function fetchGitHubAPI(username) {
+  const headers = { 'User-Agent': 'JobHuntPro', 'Accept': 'application/vnd.github+json' };
+  if (process.env.GITHUB_TOKEN) headers['Authorization'] = 'Bearer ' + process.env.GITHUB_TOKEN;
+
+  const userResp = await fetch('https://api.github.com/users/' + encodeURIComponent(username), { headers });
+  if (userResp.status === 403 || userResp.status === 429) {
+    const err = new Error('rate_limited');
+    err.code = 'rate_limited';
+    throw err;
+  }
+  if (userResp.status === 404) {
+    const err = new Error('not_found');
+    err.code = 'not_found';
+    throw err;
+  }
+  if (!userResp.ok) throw new Error('GitHub API error ' + userResp.status);
+
+  const user = await userResp.json();
+  const reposResp = await fetch('https://api.github.com/users/' + encodeURIComponent(username) + '/repos?per_page=100&sort=pushed', { headers });
+  const repos = reposResp.ok ? await reposResp.json() : [];
+
+  const langCounts = {};
+  let totalStars = 0;
+  (Array.isArray(repos) ? repos : []).forEach(r => {
+    if (r.fork) return;
+    if (r.language) langCounts[r.language] = (langCounts[r.language] || 0) + 1;
+    totalStars += r.stargazers_count || 0;
+  });
+
+  const topLanguages = Object.entries(langCounts).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k]) => k);
+  const topRepos = (Array.isArray(repos) ? repos : [])
+    .filter(r => !r.fork)
+    .sort((a, b) => (b.stargazers_count || 0) - (a.stargazers_count || 0))
+    .slice(0, 5)
+    .map(r => ({ name: r.name, description: r.description, stars: r.stargazers_count, language: r.language, url: r.html_url }));
+
+  return {
+    github_url: user.html_url,
+    full_name: user.name || '',
+    summary: user.bio || '',
+    skills: topLanguages.join(', '),
+    stats: { public_repos: user.public_repos, followers: user.followers, total_stars: totalStars, top_repos: topRepos }
+  };
+}
+
+// Scraping fallback when API is rate-limited — pulls minimal data from public profile HTML
+async function fetchGitHubScrape(username) {
+  const url = 'https://github.com/' + encodeURIComponent(username);
+  const resp = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+      'Accept': 'text/html'
+    }
+  });
+  if (!resp.ok) throw new Error('Scrape failed: HTTP ' + resp.status);
+  const html = await resp.text();
+
+  const pick = (re) => { const m = html.match(re); return m ? m[1].trim() : ''; };
+  const name = pick(/<span[^>]*itemprop="name"[^>]*>([^<]+)</) || pick(/property="og:title"[^>]*content="([^"]+?) \(@/);
+  const bio = pick(/<div[^>]*data-bio-text[^>]*>([^<]+)</) || pick(/itemprop="description"[^>]*>\s*<div[^>]*>([\s\S]*?)<\/div>/);
+  const followers = parseInt(pick(/(\d+(?:\.\d+)?[km]?)\s*<\/span>\s*<span[^>]*>followers/i)) || 0;
+  const repoMatch = html.match(/Repositories\s*<span[^>]*>\s*(\d+)\s*</);
+  const publicRepos = repoMatch ? parseInt(repoMatch[1]) : 0;
+
+  return {
+    github_url: url,
+    full_name: name,
+    summary: bio.replace(/<[^>]+>/g, '').trim(),
+    skills: '',
+    stats: { public_repos: publicRepos, followers, total_stars: 0, top_repos: [] }
+  };
+}
+
 router.post('/import/github', async (req, res) => {
   try {
     const { username } = req.body || {};
-    if (!username) return res.status(400).json({ error: 'GitHub username required' });
-
-    const headers = { 'User-Agent': 'JobHuntPro', 'Accept': 'application/vnd.github+json' };
-    if (process.env.GITHUB_TOKEN) headers['Authorization'] = 'Bearer ' + process.env.GITHUB_TOKEN;
-
-    const userResp = await fetch('https://api.github.com/users/' + encodeURIComponent(username), { headers });
-    if (!userResp.ok) {
-      const body = await userResp.text();
-      return res.status(userResp.status).json({ error: 'GitHub: ' + body.slice(0, 200) });
+    if (!username || !/^[a-zA-Z0-9-]+$/.test(username)) {
+      return res.status(400).json({ error: 'Valid GitHub username required (letters/digits/hyphen only)' });
     }
-    const user = await userResp.json();
 
-    const reposResp = await fetch('https://api.github.com/users/' + encodeURIComponent(username) + '/repos?per_page=100&sort=pushed', { headers });
-    const repos = reposResp.ok ? await reposResp.json() : [];
-
-    const langCounts = {};
-    let totalStars = 0;
-    repos.forEach(r => {
-      if (r.fork) return;
-      if (r.language) langCounts[r.language] = (langCounts[r.language] || 0) + 1;
-      totalStars += r.stargazers_count || 0;
-    });
-
-    const topLanguages = Object.entries(langCounts).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k]) => k);
-    const topRepos = repos
-      .filter(r => !r.fork)
-      .sort((a, b) => (b.stargazers_count || 0) - (a.stargazers_count || 0))
-      .slice(0, 5)
-      .map(r => ({ name: r.name, description: r.description, stars: r.stargazers_count, language: r.language, url: r.html_url }));
-
-    const extracted = {
-      github_url: user.html_url,
-      full_name: user.name || '',
-      summary: user.bio || '',
-      skills: topLanguages.join(', '),
-      stats: { public_repos: user.public_repos, followers: user.followers, total_stars: totalStars, top_repos: topRepos }
-    };
+    let extracted;
+    try {
+      extracted = await fetchGitHubAPI(username);
+    } catch (e) {
+      if (e.code === 'not_found') return res.status(404).json({ error: 'GitHub user not found: ' + username });
+      if (e.code === 'rate_limited') {
+        // Fall back to scraping public profile
+        try {
+          extracted = await fetchGitHubScrape(username);
+          extracted._note = 'GitHub API rate-limited (Render shared IP). Used public profile scrape — skill list unavailable. Set GITHUB_TOKEN env var on Render for full data (free token at github.com/settings/tokens).';
+        } catch (scrapeErr) {
+          return res.status(429).json({
+            error: 'GitHub API rate-limited and scrape fallback failed. Set GITHUB_TOKEN env var on Render: https://github.com/settings/tokens (any token with public_repo scope works, ~60s setup).'
+          });
+        }
+      } else {
+        throw e;
+      }
+    }
 
     res.json({ ok: true, extracted });
   } catch (err) {
