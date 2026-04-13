@@ -95,9 +95,17 @@ router.get('/auto/search-jobs', async (req, res) => {
   // Source 4: RemoteOK (free, no API key)
   fetches.push(
     fetch('https://remoteok.com/api', {
-      headers: { 'User-Agent': 'JobHuntPro/1.0' }
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+        'Accept': 'application/json,text/plain,*/*',
+        'Accept-Language': 'en-US,en;q=0.9'
+      }
     })
-      .then(r => r.json())
+      .then(async r => {
+        const text = await r.text();
+        try { return JSON.parse(text); }
+        catch { throw new Error('RemoteOK returned non-JSON (status ' + r.status + ')'); }
+      })
       .then(data => {
         // First element is metadata, skip it
         const jobs = Array.isArray(data) ? data.slice(1) : [];

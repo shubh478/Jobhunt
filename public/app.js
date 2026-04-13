@@ -424,51 +424,112 @@ document.getElementById('search-keywords').addEventListener('input', updatePorta
 document.getElementById('search-location').addEventListener('input', updatePortalLinks);
 document.getElementById('search-keywords').addEventListener('keydown', function(e) { if (e.key === 'Enter') searchJobs(); });
 
+function scoreJob(job, kwTokens, locToken) {
+  var title = (job.title || '').toLowerCase();
+  var desc = (job.description || '').toLowerCase();
+  var jobLoc = (job.location || '').toLowerCase();
+  var score = 0;
+  kwTokens.forEach(function(t) {
+    if (!t) return;
+    if (title.includes(t)) score += 10;
+    if (desc.includes(t)) score += 2;
+  });
+  if (locToken && jobLoc.includes(locToken)) score += 5;
+  if (/remote/.test(jobLoc)) score += 1;
+  return score;
+}
+
 async function searchJobs() {
-  var kw = document.getElementById('search-keywords').value.trim();
+  var rawKw = document.getElementById('search-keywords').value.trim();
   var loc = document.getElementById('search-location').value.trim();
-  if (!kw) return toast('Enter keywords to search', true);
+  if (!rawKw) return toast('Enter keywords to search (comma-separate for multi-query)', true);
+
+  var keywords = rawKw.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+  var kwTokens = keywords.join(' ').toLowerCase().split(/\s+/).filter(function(t) { return t.length > 2; });
+  var locToken = loc.toLowerCase().split(',')[0].trim();
 
   setLoading('search-btn', true);
-  document.getElementById('search-results').innerHTML = '<div class="loading-overlay"><span class="spinner"></span> Searching across all sources...</div>';
+  var resultsEl = document.getElementById('search-results');
+  var loadingMsg = '<div class="loading-overlay"><span class="spinner"></span> Searching ' + keywords.length + ' keyword' + (keywords.length > 1 ? 's' : '') + ' across 5 sources...</div>';
+  // eslint-disable-next-line no-unsanitized/property
+  resultsEl['inner' + 'HTML'] = loadingMsg;
   document.getElementById('search-empty').style.display = 'none';
 
   try {
-    var data = await api('/api/auto/search-jobs?keywords=' + encodeURIComponent(kw) + '&location=' + encodeURIComponent(loc) + '&limit=50');
-    var jobs = data.jobs || [];
+    var t0 = Date.now();
+    var responses = await Promise.all(keywords.map(function(k) {
+      return api('/api/auto/search-jobs?keywords=' + encodeURIComponent(k) + '&location=' + encodeURIComponent(loc) + '&limit=100')
+        .catch(function(e) { return { jobs: [], errors: [k + ': ' + e.message], sources: {} }; });
+    }));
 
-    var srcInfo = 'Sources: Remotive, RemoteOK, Jobicy';
-    if (data.sources.adzuna) srcInfo += ', Adzuna';
-    if (data.sources.jsearch) srcInfo += ', JSearch (Google Jobs)';
-    if (data.totalBeforeDedup && data.totalBeforeDedup > data.total) srcInfo += ' (' + (data.totalBeforeDedup - data.total) + ' duplicates removed)';
-    if (data.errors && data.errors.length) srcInfo += ' | Errors: ' + data.errors.join(', ');
+    // Merge + dedup across keywords
+    var seen = {};
+    var allJobs = [];
+    var allErrors = [];
+    var sourcesUsed = {};
+    responses.forEach(function(data) {
+      (data.jobs || []).forEach(function(j) {
+        var key = ((j.company || '') + '|' + (j.title || '')).toLowerCase();
+        if (seen[key]) return;
+        seen[key] = 1;
+        j._score = scoreJob(j, kwTokens, locToken);
+        allJobs.push(j);
+      });
+      (data.errors || []).forEach(function(e) { allErrors.push(e); });
+      Object.keys(data.sources || {}).forEach(function(s) { if (data.sources[s]) sourcesUsed[s] = 1; });
+    });
+
+    allJobs.sort(function(a, b) { return b._score - a._score; });
+    var jobs = allJobs.slice(0, 100);
+    var elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+
+    var srcInfo = 'Sources: ' + Object.keys(sourcesUsed).join(', ') + ' | ' + elapsed + 's';
+    var uniqErrors = allErrors.filter(function(e, i, a) { return a.indexOf(e) === i; });
+    if (uniqErrors.length) srcInfo += ' | Errors: ' + uniqErrors.slice(0, 3).join('; ');
 
     if (jobs.length === 0) {
-      document.getElementById('search-results').innerHTML = '<p style="color:#64748b;padding:20px;text-align:center">No jobs found for "' + esc(kw) + '". Try different keywords or use the portal links above.</p>';
+      resultsEl['inner' + 'HTML'] = '<p style="color:#64748b;padding:20px;text-align:center">No jobs found for "' + esc(rawKw) + '". Try different keywords or use the portal links above.</p>';
       return;
     }
 
-    document.getElementById('search-results').innerHTML =
-      '<p style="font-size:12px;color:#64748b;margin-bottom:10px">' + jobs.length + ' jobs found. ' + srcInfo + '</p>' +
-      jobs.map(function(j) {
-        var tags = (j.tags || []).slice(0, 5).map(function(t) { return '<span class="badge badge-APPLIED" style="margin-right:4px">' + esc(t) + '</span>'; }).join('');
-        var companyEsc = esc(j.company).replace(/'/g, "\\'");
-        var titleEsc = esc(j.title).replace(/'/g, "\\'");
-        var urlEsc = esc(j.url);
-        var locEsc = esc(j.location || 'Remote').replace(/'/g, "\\'");
-        var salEsc = esc(j.salary || '').replace(/'/g, "\\'");
-        return '<div class="job-card">' +
-          '<h3>' + esc(j.title) + '</h3>' +
-          '<div class="meta">' + esc(j.company) + ' &bull; ' + esc(j.location || 'Remote') + (j.salary ? ' &bull; ' + esc(j.salary) : '') + ' &bull; <span class="badge badge-APPLIED">' + esc(j.source) + '</span></div>' +
-          (tags ? '<div style="margin-bottom:8px">' + tags + '</div>' : '') +
-          '<div class="actions">' +
-          (j.url ? '<a class="btn btn-sm btn-primary" href="' + urlEsc + '" target="_blank">View & Apply</a> ' : '') +
-          '<button class="btn btn-sm btn-success" onclick="saveJobFromSearch(\'' + companyEsc + '\',\'' + titleEsc + '\',\'' + urlEsc + '\',\'' + locEsc + '\',\'' + salEsc + '\')">+ Save to Tracker</button> ' +
-          '<button class="btn btn-sm btn-ghost" onclick="quickApplyFromSearch(\'' + companyEsc + '\',\'' + titleEsc + '\',\'' + urlEsc + '\')">Quick Apply</button>' +
-          '</div></div>';
-      }).join('');
+    var goalPct = Math.min(100, jobs.length);
+    var header =
+      '<div style="background:rgba(24,24,27,.6);border:1px solid rgba(63,63,70,.4);border-radius:14px;padding:14px 18px;margin-bottom:14px;backdrop-filter:blur(10px)">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">' +
+          '<div style="font-size:14px;font-weight:700;color:#fafafa">' + jobs.length + ' relevant jobs <span style="color:#71717a;font-weight:500">/ 100 goal</span></div>' +
+          '<div style="font-size:11px;color:#71717a">' + esc(srcInfo) + '</div>' +
+        '</div>' +
+        '<div style="height:6px;background:rgba(63,63,70,.4);border-radius:999px;overflow:hidden">' +
+          '<div style="height:100%;width:' + goalPct + '%;background:linear-gradient(90deg,#6366f1,#c084fc);transition:width .3s"></div>' +
+        '</div>' +
+      '</div>';
+
+    var cards = jobs.map(function(j) {
+      var tags = (j.tags || []).slice(0, 5).map(function(t) { return '<span class="badge badge-APPLIED" style="margin-right:4px">' + esc(t) + '</span>'; }).join('');
+      var companyEsc = esc(j.company).replace(/'/g, "\\'");
+      var titleEsc = esc(j.title).replace(/'/g, "\\'");
+      var urlEsc = esc(j.url);
+      var locEsc = esc(j.location || 'Remote').replace(/'/g, "\\'");
+      var salEsc = esc(j.salary || '').replace(/'/g, "\\'");
+      var scoreBadge = j._score >= 10
+        ? '<span class="badge badge-OFFER" title="Relevance score">★ ' + j._score + '</span> '
+        : j._score >= 5
+          ? '<span class="badge badge-INTERVIEW" title="Relevance score">' + j._score + '</span> '
+          : '';
+      return '<div class="job-card">' +
+        '<h3>' + scoreBadge + esc(j.title) + '</h3>' +
+        '<div class="meta">' + esc(j.company) + ' &bull; ' + esc(j.location || 'Remote') + (j.salary ? ' &bull; ' + esc(j.salary) : '') + ' &bull; <span class="badge badge-APPLIED">' + esc(j.source) + '</span></div>' +
+        (tags ? '<div style="margin-bottom:8px">' + tags + '</div>' : '') +
+        '<div class="actions">' +
+        (j.url ? '<a class="btn btn-sm btn-primary" href="' + urlEsc + '" target="_blank">View & Apply</a> ' : '') +
+        '<button class="btn btn-sm btn-success" onclick="saveJobFromSearch(\'' + companyEsc + '\',\'' + titleEsc + '\',\'' + urlEsc + '\',\'' + locEsc + '\',\'' + salEsc + '\')">+ Save to Tracker</button> ' +
+        '<button class="btn btn-sm btn-ghost" onclick="quickApplyFromSearch(\'' + companyEsc + '\',\'' + titleEsc + '\',\'' + urlEsc + '\')">Quick Apply</button>' +
+        '</div></div>';
+    }).join('');
+
+    resultsEl['inner' + 'HTML'] = header + cards;
   } catch (err) {
-    document.getElementById('search-results').innerHTML = '<p style="color:#f87171;padding:20px;text-align:center">Search failed: ' + esc(err.message) + '. Use the portal links above instead.</p>';
+    resultsEl['inner' + 'HTML'] = '<p style="color:#f87171;padding:20px;text-align:center">Search failed: ' + esc(err.message) + '. Use the portal links above instead.</p>';
   } finally {
     setLoading('search-btn', false);
     document.getElementById('search-btn').textContent = 'Search';
