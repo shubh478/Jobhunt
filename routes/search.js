@@ -29,7 +29,7 @@ router.get('/auto/search-jobs', async (req, res) => {
             source: 'Remotive',
             tags: (j.tags || []).slice(0, 5),
             posted: j.publication_date || '',
-            description: (j.description || '').replace(/<[^>]*>/g, '').substring(0, 300)
+            description: (j.description || '').replace(/<[^>]*>/g, '').substring(0, 1500)
           });
         });
       })
@@ -54,7 +54,7 @@ router.get('/auto/search-jobs', async (req, res) => {
               source: 'Adzuna',
               tags: [j.category?.label].filter(Boolean),
               posted: j.created || '',
-              description: (j.description || '').substring(0, 300)
+              description: (j.description || '').substring(0, 1500)
             });
           });
         })
@@ -84,7 +84,7 @@ router.get('/auto/search-jobs', async (req, res) => {
               source: 'JSearch',
               tags: [j.job_employment_type, j.employer_name].filter(Boolean),
               posted: j.job_posted_at_datetime_utc || '',
-              description: (j.job_description || '').substring(0, 300)
+              description: (j.job_description || '').substring(0, 1500)
             });
           });
         })
@@ -127,7 +127,7 @@ router.get('/auto/search-jobs', async (req, res) => {
               source: 'RemoteOK',
               tags: (j.tags || []).slice(0, 5),
               posted: j.date || '',
-              description: (j.description || '').replace(/<[^>]*>/g, '').substring(0, 300)
+              description: (j.description || '').replace(/<[^>]*>/g, '').substring(0, 1500)
             });
           });
       })
@@ -149,7 +149,7 @@ router.get('/auto/search-jobs', async (req, res) => {
             source: 'Jobicy',
             tags: [j.jobIndustry, j.jobType].filter(Boolean),
             posted: j.pubDate || '',
-            description: (j.jobDescription || '').replace(/<[^>]*>/g, '').substring(0, 300)
+            description: (j.jobDescription || '').replace(/<[^>]*>/g, '').substring(0, 1500)
           });
         });
       })

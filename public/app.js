@@ -671,6 +671,7 @@ async function searchJobs() {
 
     allJobs.sort(function(a, b) { return b._score - a._score; });
     var jobs = allJobs.slice(0, 100);
+    __lastSearchJobs = jobs; // make available to the preview modal
     var elapsed = ((Date.now() - t0) / 1000).toFixed(1);
 
     var srcInfo = 'Sources: ' + Object.keys(sourcesUsed).join(', ') + ' | ' + elapsed + 's';
@@ -721,8 +722,8 @@ async function searchJobs() {
         '<div class="meta">' + esc(j.company) + ' &bull; ' + esc(j.location || 'Remote') + (j.salary ? ' &bull; ' + esc(j.salary) : '') + ' &bull; <span class="badge badge-APPLIED">' + esc(j.source) + '</span></div>' +
         (tags ? '<div style="margin-bottom:8px">' + tags + '</div>' : '') +
         '<div class="actions">' +
+        '<button class="btn btn-sm btn-ghost" onclick="openJobPreview(\'' + companyEsc + '\',\'' + titleEsc + '\')">View details</button> ' +
         '<button class="btn btn-sm btn-primary" onclick="openApplyHelper(\'' + companyEsc + '\',\'' + titleEsc + '\',\'' + urlEsc + '\',\'' + descEsc + '\')">⚡ Apply with Helper</button> ' +
-        (j.url ? '<a class="btn btn-sm btn-ghost" href="' + urlEsc + '" target="_blank">Open</a> ' : '') +
         '<button class="btn btn-sm btn-success" onclick="saveJobFromSearch(\'' + companyEsc + '\',\'' + titleEsc + '\',\'' + urlEsc + '\',\'' + locEsc + '\',\'' + salEsc + '\')">+ Save</button>' +
         '</div></div>';
     }).join('');
@@ -1762,6 +1763,69 @@ function doBulkApply(selectedIds, templateId, sendEmail, useAI) {
 }
 
 // ============================== INIT ==============================
+// ============================== JOB PREVIEW MODAL ==============================
+// Cache the last search results so the preview modal can look up by company|title key
+var __lastSearchJobs = [];
+
+function openJobPreview(company, role) {
+  var key = (company + '|' + role).toLowerCase();
+  var job = __lastSearchJobs.find(function(j) {
+    return ((j.company || '') + '|' + (j.title || '')).toLowerCase() === key;
+  });
+  if (!job) return toast('Job details not found', true);
+
+  document.getElementById('jp-title').textContent = job.title || '';
+  var metaParts = [];
+  if (job.company) metaParts.push(job.company);
+  if (job.location) metaParts.push(job.location);
+  if (job.salary) metaParts.push(job.salary);
+  if (job.source) metaParts.push(job.source);
+  if (job.posted) metaParts.push('Posted: ' + job.posted.split('T')[0]);
+  document.getElementById('jp-meta').textContent = metaParts.join(' • ');
+
+  var tagsEl = document.getElementById('jp-tags');
+  tagsEl.textContent = '';
+  (job.tags || []).slice(0, 8).forEach(function(t) {
+    var span = document.createElement('span');
+    span.className = 'badge badge-APPLIED';
+    span.style.marginRight = '4px';
+    span.textContent = t;
+    tagsEl.appendChild(span);
+  });
+  if (job._reasons && job._reasons.length) {
+    var matchSpan = document.createElement('span');
+    matchSpan.className = 'badge badge-OFFER';
+    matchSpan.style.marginLeft = '6px';
+    matchSpan.textContent = '★ ' + (job._score || 0) + ' (' + job._reasons.join(', ') + ')';
+    tagsEl.appendChild(matchSpan);
+  }
+
+  // Description — use textContent to avoid XSS from external sources
+  var descEl = document.getElementById('jp-description');
+  descEl.textContent = job.description || '(No description available from this source — click "Open original" for full details on the company\'s site.)';
+
+  // External link (small, optional)
+  var extLink = document.getElementById('jp-external-link');
+  if (job.url) {
+    extLink.href = job.url;
+    extLink.style.display = '';
+  } else {
+    extLink.style.display = 'none';
+  }
+
+  // Wire action buttons to this specific job
+  document.getElementById('jp-apply-btn').onclick = function() {
+    closeModal('job-preview-modal');
+    openApplyHelper(job.company, job.title, job.url || '', job.description || '');
+  };
+  document.getElementById('jp-save-btn').onclick = function() {
+    saveJobFromSearch(job.company, job.title, job.url || '', job.location || '', job.salary || '');
+    closeModal('job-preview-modal');
+  };
+
+  document.getElementById('job-preview-modal').classList.add('open');
+}
+
 // ============================== APPLY HELPER ==============================
 var __appliedJobKeys = null;
 async function loadAppliedJobKeys() {
