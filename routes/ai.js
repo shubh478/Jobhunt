@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db/pool');
-const { getAvailableProviders, getFirstAvailable, generate, cacheKey } = require('../lib/ai-provider');
+const { getAvailableProviders, getFirstAvailable, generate, generateWithFallback, cacheKey } = require('../lib/ai-provider');
 
 // Get available AI providers
 router.get('/ai/providers', async (req, res) => {
@@ -31,11 +31,9 @@ router.post('/ai/test', async (req, res) => {
   try {
     const profileResult = await pool.query('SELECT ai_provider FROM profile WHERE user_id=$1', [req.userId]);
     const preferred = profileResult.rows[0]?.ai_provider || 'gemini';
-    const providerId = getFirstAvailable(preferred);
-    if (!providerId) return res.status(400).json({ error: 'No AI provider configured. Add GEMINI_API_KEY (free) to your environment variables.' });
 
-    const response = await generate(providerId, 'You are a helpful assistant.', 'Say "AI connection successful!" in exactly those words.');
-    res.json({ ok: true, provider: providerId, response: response.substring(0, 100) });
+    const { text, provider } = await generateWithFallback(preferred, 'You are a helpful assistant.', 'Say "AI connection successful!" in exactly those words.');
+    res.json({ ok: true, provider, response: text.substring(0, 100) });
   } catch (err) {
     res.status(500).json({ error: `Connection failed: ${err.message}` });
   }
@@ -48,20 +46,17 @@ router.post('/ai/generate-cover', async (req, res) => {
     if (!company || !role) return res.status(400).json({ error: 'Company and role required' });
 
     const profileResult = await pool.query('SELECT * FROM profile WHERE user_id=$1', [req.userId]);
-    const profile = profileResult.rows[0];
-    if (!profile || !profile.full_name) return res.status(400).json({ error: 'Set up your profile in Settings first' });
+    const profile = profileResult.rows[0] || {};
 
     const preferred = profile.ai_provider || 'gemini';
-    const providerId = getFirstAvailable(preferred);
-    if (!providerId) return res.status(400).json({ error: 'No AI provider configured. Add GEMINI_API_KEY (free) to environment variables.' });
 
     // Check cache
     const key = cacheKey({ company, role, job_description, skills: profile.skills, tone });
-    const cached = await pool.query('SELECT response FROM ai_cache WHERE cache_key=$1 AND user_id=$2', [key, req.userId]);
+    const cached = await pool.query('SELECT response, provider FROM ai_cache WHERE cache_key=$1 AND user_id=$2', [key, req.userId]);
     if (cached.rows.length > 0) {
       try {
         const parsed = JSON.parse(cached.rows[0].response);
-        return res.json({ ...parsed, provider: providerId, cached: true });
+        return res.json({ ...parsed, provider: cached.rows[0].provider, cached: true });
       } catch {}
     }
 
@@ -103,7 +98,7 @@ Requirements:
 4. End with a clear call to action
 5. Include contact info at the bottom`;
 
-    const aiResponse = await generate(providerId, systemPrompt, userPrompt);
+    const { text: aiResponse, provider: usedProvider } = await generateWithFallback(preferred, systemPrompt, userPrompt);
 
     let subject, body;
     try {
@@ -112,17 +107,17 @@ Requirements:
       subject = parsed.subject;
       body = parsed.body;
     } catch {
-      subject = `Application for ${role} at ${company} - ${profile.full_name}`;
+      subject = `Application for ${role} at ${company} - ${profile.full_name || ''}`;
       body = aiResponse;
     }
 
     // Cache the response
     await pool.query(
       'INSERT INTO ai_cache (user_id, cache_key, response, provider) VALUES ($1, $2, $3, $4) ON CONFLICT (cache_key) DO UPDATE SET response=$3, provider=$4, user_id=$1',
-      [req.userId, key, JSON.stringify({ subject, body }), providerId]
+      [req.userId, key, JSON.stringify({ subject, body }), usedProvider]
     );
 
-    res.json({ subject, body, provider: providerId, cached: false });
+    res.json({ subject, body, provider: usedProvider, cached: false });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -135,10 +130,8 @@ router.post('/ai/generate-cold-email', async (req, res) => {
     if (!company || !role) return res.status(400).json({ error: 'Company and role required' });
 
     const profileResult = await pool.query('SELECT * FROM profile WHERE user_id=$1', [req.userId]);
-    const profile = profileResult.rows[0];
-    const preferred = profile?.ai_provider || 'gemini';
-    const providerId = getFirstAvailable(preferred);
-    if (!providerId) return res.status(400).json({ error: 'No AI provider configured.' });
+    const profile = profileResult.rows[0] || {};
+    const preferred = profile.ai_provider || 'gemini';
 
     const systemPrompt = `You are an expert at writing cold emails that get responses. Your emails are short (80-120 words), personal, and reference something specific about the company or role. You create compelling subject lines with high open rates.
 
@@ -157,7 +150,7 @@ Skills: ${profile.skills || 'Full stack development'}
 
 Write 3 subject line options (compelling, not generic) and a short cold email body.`;
 
-    const aiResponse = await generate(providerId, systemPrompt, userPrompt);
+    const { text: aiResponse, provider: usedProvider } = await generateWithFallback(preferred, systemPrompt, userPrompt);
 
     let result;
     try {
@@ -170,7 +163,7 @@ Write 3 subject line options (compelling, not generic) and a short cold email bo
       };
     }
 
-    res.json({ ...result, provider: providerId });
+    res.json({ ...result, provider: usedProvider });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -183,10 +176,8 @@ router.post('/ai/match-score', async (req, res) => {
     if (!job_title) return res.status(400).json({ error: 'Job title required' });
 
     const profileResult = await pool.query('SELECT * FROM profile WHERE user_id=$1', [req.userId]);
-    const profile = profileResult.rows[0];
-    const preferred = profile?.ai_provider || 'gemini';
-    const providerId = getFirstAvailable(preferred);
-    if (!providerId) return res.status(400).json({ error: 'No AI provider configured.' });
+    const profile = profileResult.rows[0] || {};
+    const preferred = profile.ai_provider || 'gemini';
 
     const systemPrompt = `You are a job matching expert. Analyze how well a candidate's profile matches a job posting. Return ONLY valid JSON:
 {"score": 0-100, "matching_skills": ["skill1", "skill2"], "missing_skills": ["skill1"], "tip": "one sentence advice"}`;
@@ -204,7 +195,7 @@ Candidate:
 
 Score 0-100 based on skills match, experience level, and role fit.`;
 
-    const aiResponse = await generate(providerId, systemPrompt, userPrompt);
+    const { text: aiResponse, provider: usedProvider } = await generateWithFallback(preferred, systemPrompt, userPrompt);
 
     let result;
     try {
@@ -214,7 +205,6 @@ Score 0-100 based on skills match, experience level, and role fit.`;
       result = { score: 50, matching_skills: [], missing_skills: [], tip: 'Could not parse match analysis' };
     }
 
-    // Save score to application if ID provided
     if (application_id) {
       await pool.query(
         'UPDATE applications SET match_score=$1, match_reasons=$2 WHERE id=$3 AND user_id=$4',
@@ -222,20 +212,17 @@ Score 0-100 based on skills match, experience level, and role fit.`;
       );
     }
 
-    res.json({ ...result, provider: providerId });
+    res.json({ ...result, provider: usedProvider });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Bulk score WISHLIST jobs
 router.post('/ai/bulk-score', async (req, res) => {
   try {
     const profileResult = await pool.query('SELECT * FROM profile WHERE user_id=$1', [req.userId]);
-    const profile = profileResult.rows[0];
-    const preferred = profile?.ai_provider || 'gemini';
-    const providerId = getFirstAvailable(preferred);
-    if (!providerId) return res.status(400).json({ error: 'No AI provider configured.' });
+    const profile = profileResult.rows[0] || {};
+    const preferred = profile.ai_provider || 'gemini';
 
     const jobs = await pool.query("SELECT id, company, role, notes FROM applications WHERE user_id=$1 AND status='WISHLIST' AND match_score IS NULL LIMIT 20", [req.userId]);
     const results = [];
@@ -245,7 +232,7 @@ router.post('/ai/bulk-score', async (req, res) => {
         const systemPrompt = `You are a job matching expert. Return ONLY valid JSON: {"score": 0-100, "matching_skills": ["skill1"], "missing_skills": ["skill1"], "tip": "advice"}`;
         const userPrompt = `Rate match: Job "${job.role}" at ${job.company}. Description: ${(job.notes || '').substring(0, 300)}. Candidate: ${profile.current_role}, ${profile.experience_years}yr, skills: ${profile.skills}`;
 
-        const aiResponse = await generate(providerId, systemPrompt, userPrompt);
+        const { text: aiResponse } = await generateWithFallback(preferred, systemPrompt, userPrompt);
         const cleaned = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
         const parsed = JSON.parse(cleaned);
 
@@ -274,10 +261,8 @@ router.post('/ai/interview-prep', async (req, res) => {
     const job = jobResult.rows[0];
 
     const profileResult = await pool.query('SELECT * FROM profile WHERE user_id=$1', [req.userId]);
-    const profile = profileResult.rows[0];
-    const preferred = profile?.ai_provider || 'gemini';
-    const providerId = getFirstAvailable(preferred);
-    if (!providerId) return res.status(400).json({ error: 'No AI provider configured.' });
+    const profile = profileResult.rows[0] || {};
+    const preferred = profile.ai_provider || 'gemini';
 
     const systemPrompt = `You are an interview coach. Generate targeted practice questions based on the specific company and role. Return ONLY valid JSON array:
 [{"category": "technical|behavioral|system_design|company_specific", "question": "...", "suggested_answer": "brief answer framework", "difficulty": "EASY|MEDIUM|HARD"}]
@@ -289,11 +274,11 @@ Company: ${job.company}
 Role: ${job.role}
 Job Notes: ${(job.notes || '').substring(0, 500)}
 
-Candidate Background: ${profile.current_role}, ${profile.experience_years}yr experience, skills: ${profile.skills}
+Candidate Background: ${profile.current_role || 'Software Engineer'}, ${profile.experience_years || '2'}yr experience, skills: ${profile.skills || ''}
 
 Make questions specific to this company and role, not generic.`;
 
-    const aiResponse = await generate(providerId, systemPrompt, userPrompt);
+    const { text: aiResponse, provider: usedProvider } = await generateWithFallback(preferred, systemPrompt, userPrompt);
 
     let questions;
     try {
@@ -313,7 +298,7 @@ Make questions specific to this company and role, not generic.`;
       saved.push({ id: result.rows[0].id, ...q });
     }
 
-    res.json({ ok: true, questions: saved, provider: providerId });
+    res.json({ ok: true, questions: saved, provider: usedProvider });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
