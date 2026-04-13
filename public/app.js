@@ -1818,24 +1818,34 @@ async function generateBookmarklet() {
         years:       ['yearsofexperience','yearsexperience','years_of_experience','years-of-experience','experienceyears','totalexperience'],
         location:    ['location','city','currentcity','currentlocation']
       };
+      var SKIP_TYPES = { file: 1, submit: 1, button: 1, reset: 1, checkbox: 1, radio: 1, hidden: 1, image: 1, color: 1, range: 1 };
       var filled = 0;
       var inputs = D.querySelectorAll('input,textarea');
       var setVal = function(el, v) {
-        if (!v || el.value) return false;
-        var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value') ||
-                           Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value');
-        if (nativeSetter && nativeSetter.set) nativeSetter.set.call(el, v); else el.value = v;
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-        return true;
+        try {
+          if (!v) return false;
+          var t = (el.type || 'text').toLowerCase();
+          if (SKIP_TYPES[t]) return false;
+          if (el.disabled || el.readOnly) return false;
+          if (el.value && el.value.trim().length > 0) return false;
+          var proto = el.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+          var nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value');
+          if (nativeSetter && nativeSetter.set) nativeSetter.set.call(el, v); else el.value = v;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          el.dispatchEvent(new Event('blur', { bubbles: true }));
+          return true;
+        } catch (e) { return false; }
       };
       inputs.forEach(function(el) {
-        var keys = ((el.name || '') + ' ' + (el.id || '') + ' ' + (el.placeholder || '') + ' ' + (el.getAttribute('aria-label') || '') + ' ' + (el.getAttribute('autocomplete') || '')).toLowerCase().replace(/[^a-z0-9]/g, '');
-        for (var fld in fillMap) {
-          if (!data[fld]) continue;
-          var matched = fillMap[fld].some(function(k) { return keys.indexOf(k) >= 0; });
-          if (matched && setVal(el, data[fld])) { filled++; break; }
-        }
+        try {
+          var keys = ((el.name || '') + ' ' + (el.id || '') + ' ' + (el.placeholder || '') + ' ' + (el.getAttribute('aria-label') || '') + ' ' + (el.getAttribute('autocomplete') || '') + ' ' + (el.labels && el.labels[0] ? el.labels[0].textContent : '')).toLowerCase().replace(/[^a-z0-9]/g, '');
+          for (var fld in fillMap) {
+            if (!data[fld]) continue;
+            var matched = fillMap[fld].some(function(k) { return keys.indexOf(k) >= 0; });
+            if (matched && setVal(el, data[fld])) { filled++; break; }
+          }
+        } catch (e) {}
       });
       var msg = D.createElement('div');
       msg.textContent = '✓ Job Hunt Pro filled ' + filled + ' field' + (filled !== 1 ? 's' : '');
