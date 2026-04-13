@@ -39,19 +39,22 @@ router.post('/auto/bulk-apply', async (req, res) => {
   if (!job_ids || !job_ids.length) return res.status(400).json({ error: 'No jobs selected' });
 
   const profileResult = await pool.query('SELECT * FROM profile WHERE user_id=$1', [req.userId]);
-  const profile = profileResult.rows[0];
-  if (!profile || !profile.full_name) return res.status(400).json({ error: 'Set up your profile in Settings first' });
+  const profile = profileResult.rows[0] || {};
 
   const tplResult = await pool.query('SELECT * FROM cover_templates WHERE id=$1 AND user_id=$2', [template_id, req.userId]);
-  if (tplResult.rows.length === 0) return res.status(400).json({ error: 'Template not found' });
+  if (tplResult.rows.length === 0) return res.status(400).json({ error: 'Cover letter template not found. Add one in Settings → Cover Templates, or pick a different template.' });
   const tpl = tplResult.rows[0];
 
+  // Email is optional. If user asked for it but SMTP isn't configured,
+  // degrade gracefully — still mark jobs as applied, just don't send mail.
   let emailCfg = null;
+  let emailWarning = null;
   if (send_email) {
     const cfgResult = await pool.query('SELECT * FROM email_config WHERE user_id=$1', [req.userId]);
     emailCfg = cfgResult.rows[0];
     if (!emailCfg || !emailCfg.smtp_user || !emailCfg.smtp_pass) {
-      return res.status(400).json({ error: 'Configure email in Settings first' });
+      emailWarning = 'Email sending was requested but SMTP is not configured in Settings. Applications were still marked as APPLIED, no emails sent.';
+      emailCfg = null;
     }
   }
 
@@ -163,7 +166,12 @@ Summary: ${profile.summary}`;
     results.push({ id: jobId, company: job.company, role: job.role, subject, emailStatus, status: 'applied' });
   }
 
-  res.json({ ok: true, results, applied: results.filter(r => r.status === 'applied').length });
+  res.json({
+    ok: true,
+    results,
+    applied: results.filter(r => r.status === 'applied').length,
+    warning: emailWarning
+  });
 });
 
 router.get('/auto/stats', async (req, res) => {

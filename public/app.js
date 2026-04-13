@@ -1519,7 +1519,8 @@ async function bulkApply() {
           use_ai: useAI
         });
 
-        document.getElementById('auto-apply-status').innerHTML = '<span style="color:#22c55e">Done! Applied to ' + result.applied + ' jobs</span>';
+        var warnHTML = result.warning ? '<div style="color:#fbbf24;font-size:12px;margin-top:6px">⚠ ' + esc(result.warning) + '</div>' : '';
+        document.getElementById('auto-apply-status').innerHTML = '<span style="color:#22c55e">Done! Marked ' + result.applied + ' jobs as APPLIED</span>' + warnHTML;
 
         document.getElementById('auto-log-section').style.display = 'block';
         document.getElementById('auto-apply-log').innerHTML =
