@@ -527,11 +527,13 @@ async function searchJobs() {
   try {
     var t0 = Date.now();
     var profilePromise = getProfileForScoring();
+    var appliedKeysPromise = loadAppliedJobKeys();
     var responses = await Promise.all(keywords.map(function(k) {
       return api('/api/auto/search-jobs?keywords=' + encodeURIComponent(k) + '&location=' + encodeURIComponent(loc) + '&limit=100')
         .catch(function(e) { return { jobs: [], errors: [k + ': ' + e.message], sources: {} }; });
     }));
     var profile = await profilePromise;
+    var appliedKeys = await appliedKeysPromise;
 
     // Merge + dedup across keywords
     var seen = {};
@@ -582,6 +584,7 @@ async function searchJobs() {
       var urlEsc = esc(j.url);
       var locEsc = esc(j.location || 'Remote').replace(/'/g, "\\'");
       var salEsc = esc(j.salary || '').replace(/'/g, "\\'");
+      var descEsc = esc(j.description || '').replace(/'/g, "\\'").replace(/\n/g, ' ').slice(0, 800);
       var reasonsTxt = (j._reasons && j._reasons.length) ? ' (' + j._reasons.join(', ') + ')' : '';
       var scoreBadge = j._score >= 20
         ? '<span class="badge badge-OFFER" title="Relevance score' + reasonsTxt + '">★★ ' + j._score + reasonsTxt + '</span> '
@@ -590,14 +593,16 @@ async function searchJobs() {
           : j._score >= 5
             ? '<span class="badge badge-INTERVIEW" title="Relevance score' + reasonsTxt + '">' + j._score + reasonsTxt + '</span> '
             : '';
-      return '<div class="job-card">' +
-        '<h3>' + scoreBadge + esc(j.title) + '</h3>' +
+      var alreadyApplied = appliedKeys && appliedKeys.has(jobKey(j.company, j.title));
+      var appliedBadge = alreadyApplied ? '<span class="badge badge-DONE" style="margin-left:6px">✓ in tracker</span>' : '';
+      return '<div class="job-card"' + (alreadyApplied ? ' style="opacity:.6"' : '') + '>' +
+        '<h3>' + scoreBadge + esc(j.title) + appliedBadge + '</h3>' +
         '<div class="meta">' + esc(j.company) + ' &bull; ' + esc(j.location || 'Remote') + (j.salary ? ' &bull; ' + esc(j.salary) : '') + ' &bull; <span class="badge badge-APPLIED">' + esc(j.source) + '</span></div>' +
         (tags ? '<div style="margin-bottom:8px">' + tags + '</div>' : '') +
         '<div class="actions">' +
-        (j.url ? '<a class="btn btn-sm btn-primary" href="' + urlEsc + '" target="_blank">View & Apply</a> ' : '') +
-        '<button class="btn btn-sm btn-success" onclick="saveJobFromSearch(\'' + companyEsc + '\',\'' + titleEsc + '\',\'' + urlEsc + '\',\'' + locEsc + '\',\'' + salEsc + '\')">+ Save to Tracker</button> ' +
-        '<button class="btn btn-sm btn-ghost" onclick="quickApplyFromSearch(\'' + companyEsc + '\',\'' + titleEsc + '\',\'' + urlEsc + '\')">Quick Apply</button>' +
+        '<button class="btn btn-sm btn-primary" onclick="openApplyHelper(\'' + companyEsc + '\',\'' + titleEsc + '\',\'' + urlEsc + '\',\'' + descEsc + '\')">⚡ Apply with Helper</button> ' +
+        (j.url ? '<a class="btn btn-sm btn-ghost" href="' + urlEsc + '" target="_blank">Open</a> ' : '') +
+        '<button class="btn btn-sm btn-success" onclick="saveJobFromSearch(\'' + companyEsc + '\',\'' + titleEsc + '\',\'' + urlEsc + '\',\'' + locEsc + '\',\'' + salEsc + '\')">+ Save</button>' +
         '</div></div>';
     }).join('');
 
@@ -1052,6 +1057,7 @@ function renderResources() {
 
 // ============================== SETTINGS ==============================
 async function loadSettings() {
+  generateBookmarklet();
   var data;
   try { data = await Promise.all([api('/api/profile'), api('/api/email-config'), api('/api/templates'), api('/api/resume-info'), api('/api/ai/providers')]); } catch (e) { return; }
   var p = data[0] || {}; var e = data[1] || {}; allTemplates = data[2] || []; var r = data[3] || {}; var aiData = data[4] || { providers: [], active: '' };
@@ -1538,17 +1544,169 @@ async function bulkApply() {
 }
 
 // ============================== INIT ==============================
+// ============================== APPLY HELPER ==============================
+var __appliedJobKeys = null;
+async function loadAppliedJobKeys() {
+  if (__appliedJobKeys) return __appliedJobKeys;
+  try {
+    var apps = await api('/api/applications');
+    __appliedJobKeys = new Set(apps.map(function(a) { return ((a.company || '') + '|' + (a.role || '')).toLowerCase(); }));
+  } catch { __appliedJobKeys = new Set(); }
+  return __appliedJobKeys;
+}
+
+function jobKey(company, role) { return ((company || '') + '|' + (role || '')).toLowerCase(); }
+
+function escAttr(s) { return String(s || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+
+async function openApplyHelper(company, role, url, jobDescription) {
+  var helper = document.getElementById('apply-helper');
+  document.getElementById('ah-title').textContent = role + ' @ ' + company;
+  document.getElementById('ah-meta').textContent = 'Loading your profile...';
+  // eslint-disable-next-line no-unsanitized/property
+  document.getElementById('ah-body')['inner' + 'HTML'] = '<div style="padding:20px;text-align:center;color:#71717a;font-size:12px"><span class="spinner"></span> Preparing application kit...</div>';
+  helper.classList.add('open');
+
+  // Open the job URL in a new tab so the user has both windows side by side
+  if (url) {
+    try { window.open(url, '_blank', 'noopener'); } catch {}
+  }
+
+  try {
+    var profile = await api('/api/profile');
+    var fields = [
+      { label: 'Name', value: profile.full_name },
+      { label: 'Email', value: profile.email },
+      { label: 'Phone', value: profile.phone },
+      { label: 'LinkedIn', value: profile.linkedin_url },
+      { label: 'GitHub', value: profile.github_url },
+      { label: 'Portfolio', value: profile.portfolio_url },
+      { label: 'Current role', value: profile.current_role },
+      { label: 'Years exp', value: profile.experience_years },
+      { label: 'Location', value: '' }
+    ];
+
+    var fieldsHTML = fields.filter(function(f) { return f.value; }).map(function(f, i) {
+      var id = 'ah-f-' + i;
+      return '<div class="ah-field">' +
+        '<span class="ah-field-label">' + esc(f.label) + '</span>' +
+        '<span class="ah-field-value" id="' + id + '">' + esc(f.value) + '</span>' +
+        '<button class="ah-copy-btn" onclick="ahCopy(\'' + id + '\', this)">Copy</button>' +
+      '</div>';
+    }).join('');
+
+    var skillsHTML = profile.skills ? '<div style="font-size:11px;color:#d4d4d8;line-height:1.5">' + esc(profile.skills) + '</div>' : '<div style="font-size:11px;color:#71717a">No skills set — fill profile in Settings</div>';
+
+    var coverSection = '<div class="ah-section"><div class="ah-section-title">Cover Letter</div>' +
+      '<div id="ah-cover-area"><button class="btn btn-sm btn-primary" style="width:100%" onclick="ahGenerateCover(\'' + escAttr(company) + '\',\'' + escAttr(role) + '\',\'' + escAttr(jobDescription || '') + '\')" id="ah-gen-cover-btn">🤖 Generate AI Cover Letter</button></div>' +
+      '</div>';
+
+    document.getElementById('ah-meta').textContent = (url || '').slice(0, 60);
+    // eslint-disable-next-line no-unsanitized/property
+    document.getElementById('ah-body')['inner' + 'HTML'] =
+      '<div class="ah-section">' +
+        '<div class="ah-section-title">Your Profile (1-click copy)</div>' +
+        fieldsHTML +
+      '</div>' +
+      '<div class="ah-section">' +
+        '<div class="ah-section-title">Skills</div>' +
+        skillsHTML +
+        (profile.skills ? '<button class="ah-copy-btn" style="margin-top:6px" onclick="ahCopyText(\'' + escAttr(profile.skills) + '\', this)">Copy all skills</button>' : '') +
+      '</div>' +
+      coverSection +
+      '<div class="ah-section">' +
+        '<div class="ah-section-title">Mark this application</div>' +
+        '<div class="ah-actions">' +
+          '<button class="btn btn-sm btn-success" style="flex:1" onclick="ahMarkApplied(\'' + escAttr(company) + '\',\'' + escAttr(role) + '\',\'' + escAttr(url || '') + '\')">✓ Submitted</button>' +
+          '<button class="btn btn-sm btn-ghost" style="flex:1" onclick="ahMarkSkipped(\'' + escAttr(company) + '\',\'' + escAttr(role) + '\')">Skip</button>' +
+        '</div>' +
+        '<div style="font-size:10px;color:#52525b;margin-top:6px">Tracks the application so you don\'t apply twice.</div>' +
+      '</div>';
+  } catch (e) {
+    document.getElementById('ah-meta').textContent = 'Error: ' + e.message;
+  }
+}
+
+function closeApplyHelper() {
+  document.getElementById('apply-helper').classList.remove('open');
+}
+
+function ahCopy(elId, btn) {
+  var text = document.getElementById(elId).textContent;
+  ahCopyText(text, btn);
+}
+
+function ahCopyText(text, btn) {
+  navigator.clipboard.writeText(text).then(function() {
+    var orig = btn.textContent;
+    btn.textContent = '✓ Copied';
+    btn.classList.add('copied');
+    setTimeout(function() { btn.textContent = orig; btn.classList.remove('copied'); }, 1200);
+  }).catch(function() { toast('Copy failed', true); });
+}
+
+async function ahGenerateCover(company, role, jobDesc) {
+  var btn = document.getElementById('ah-gen-cover-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating...'; }
+  try {
+    var data = await api('/api/ai/generate-cover', 'POST', { company: company, role: role, job_description: jobDesc, tone: 'formal' });
+    var area = document.getElementById('ah-cover-area');
+    // eslint-disable-next-line no-unsanitized/property
+    area['inner' + 'HTML'] =
+      '<div style="font-size:10px;color:#71717a;margin-bottom:4px">Subject:</div>' +
+      '<div style="font-size:11px;color:#fafafa;margin-bottom:8px;font-weight:600">' + esc(data.subject) + '</div>' +
+      '<div style="font-size:10px;color:#71717a;margin-bottom:4px">Body:</div>' +
+      '<div class="ah-cover-box" id="ah-cover-body">' + esc(data.body) + '</div>' +
+      '<div class="ah-actions">' +
+        '<button class="ah-copy-btn" onclick="ahCopyText(\'' + escAttr(data.subject) + '\', this)">Copy subject</button>' +
+        '<button class="ah-copy-btn" onclick="ahCopyText(\'' + escAttr(data.body).replace(/\n/g, '\\n') + '\', this)">Copy body</button>' +
+      '</div>';
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = '🤖 Generate AI Cover Letter'; }
+  }
+}
+
+async function ahMarkApplied(company, role, url) {
+  try {
+    await api('/api/applications', 'POST', {
+      company: company,
+      role: role,
+      portal_url: url,
+      status: 'APPLIED',
+      applied_date: new Date().toISOString().split('T')[0],
+      platform: 'Apply Helper',
+      follow_up_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    });
+    if (__appliedJobKeys) __appliedJobKeys.add(jobKey(company, role));
+    toast('Marked as applied');
+    closeApplyHelper();
+  } catch (e) { /* api() shows toast */ }
+}
+
+async function ahMarkSkipped(company, role) {
+  try {
+    await api('/api/applications', 'POST', {
+      company: company,
+      role: role,
+      status: 'REJECTED',
+      notes: 'Skipped via Apply Helper'
+    });
+    if (__appliedJobKeys) __appliedJobKeys.add(jobKey(company, role));
+    closeApplyHelper();
+  } catch {}
+}
+
 // ============================== IMPORTERS ==============================
 function applyExtractedToProfile(ex) {
   if (!ex) return;
   var setIf = function(id, v) { if (v) { var el = document.getElementById(id); if (el && !el.value) el.value = v; } };
-  setIf('s-full-name', ex.full_name);
+  setIf('s-name', ex.full_name);
   setIf('s-email', ex.email);
   setIf('s-phone', ex.phone);
-  setIf('s-linkedin-url', ex.linkedin_url);
-  setIf('s-github-url', ex.github_url);
+  setIf('s-linkedin', ex.linkedin_url);
+  setIf('s-github', ex.github_url);
   setIf('s-current-role', ex.current_role);
-  setIf('s-experience-years', ex.years);
+  setIf('s-exp', ex.years);
   setIf('s-summary', ex.summary);
   // Skills: merge instead of replace
   var skillsEl = document.getElementById('s-skills');
@@ -1626,6 +1784,71 @@ async function showCurrentUser() {
     var me = await api('/api/auth/me');
     var el = document.getElementById('nav-user-email');
     if (el && me) el.textContent = me.email || me.name || '';
+  } catch {}
+}
+
+async function generateBookmarklet() {
+  try {
+    var p = await api('/api/profile');
+    var data = {
+      name: p.full_name || '',
+      first: (p.full_name || '').split(' ')[0] || '',
+      last: (p.full_name || '').split(' ').slice(1).join(' ') || '',
+      email: p.email || '',
+      phone: p.phone || '',
+      linkedin: p.linkedin_url || '',
+      github: p.github_url || '',
+      portfolio: p.portfolio_url || '',
+      role: p.current_role || '',
+      years: p.experience_years || '',
+      location: ''
+    };
+    // Self-contained autofill function — runs in any page's context
+    var fn = function(D) {
+      var fillMap = {
+        name:        ['name','fullname','full_name','full-name','candidatename','applicantname'],
+        first:       ['firstname','first_name','first-name','given-name','givenname','fname'],
+        last:        ['lastname','last_name','last-name','family-name','familyname','lname','surname'],
+        email:       ['email','emailaddress','email_address','email-address','e-mail'],
+        phone:       ['phone','telephone','phonenumber','phone_number','phone-number','mobile','tel'],
+        linkedin:    ['linkedin','linkedinurl','linkedin_url','linkedin-url','linkedinprofile'],
+        github:      ['github','githuburl','github_url','github-url','githubprofile'],
+        portfolio:   ['portfolio','website','personalwebsite','personal_website','personal-website','url'],
+        role:        ['currenttitle','currentrole','currentposition','jobtitle','job_title','job-title','title'],
+        years:       ['yearsofexperience','yearsexperience','years_of_experience','years-of-experience','experienceyears','totalexperience'],
+        location:    ['location','city','currentcity','currentlocation']
+      };
+      var filled = 0;
+      var inputs = D.querySelectorAll('input,textarea');
+      var setVal = function(el, v) {
+        if (!v || el.value) return false;
+        var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value') ||
+                           Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value');
+        if (nativeSetter && nativeSetter.set) nativeSetter.set.call(el, v); else el.value = v;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+      };
+      inputs.forEach(function(el) {
+        var keys = ((el.name || '') + ' ' + (el.id || '') + ' ' + (el.placeholder || '') + ' ' + (el.getAttribute('aria-label') || '') + ' ' + (el.getAttribute('autocomplete') || '')).toLowerCase().replace(/[^a-z0-9]/g, '');
+        for (var fld in fillMap) {
+          if (!data[fld]) continue;
+          var matched = fillMap[fld].some(function(k) { return keys.indexOf(k) >= 0; });
+          if (matched && setVal(el, data[fld])) { filled++; break; }
+        }
+      });
+      var msg = D.createElement('div');
+      msg.textContent = '✓ Job Hunt Pro filled ' + filled + ' field' + (filled !== 1 ? 's' : '');
+      msg.style.cssText = 'position:fixed;top:20px;right:20px;background:#6366f1;color:#fff;padding:12px 20px;border-radius:10px;font-family:sans-serif;font-size:14px;font-weight:600;z-index:999999;box-shadow:0 8px 30px rgba(0,0,0,.4)';
+      D.body.appendChild(msg);
+      setTimeout(function() { msg.remove(); }, 3000);
+    };
+    // The data object gets baked into the bookmarklet so the user's profile travels with the bookmark
+    var dataLiteral = JSON.stringify(data);
+    var code = '(function(){var data=' + dataLiteral + ';(' + fn.toString() + ')(document);})();';
+    var href = 'javascript:' + encodeURIComponent(code);
+    var link = document.getElementById('bookmarklet-link');
+    if (link) link.href = href;
   } catch {}
 }
 showCurrentUser();
