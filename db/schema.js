@@ -167,6 +167,25 @@ async function initDB() {
     END $$;
   `).catch(e => console.warn('Drop check constraint skipped:', e.message));
 
+  // The original profile/email_config tables had `id INTEGER PRIMARY KEY` (no sequence)
+  // because they only ever held one row. Multi-user inserts now need autoincrement.
+  // Attach a sequence to each id column so new rows can be inserted without specifying id.
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'profile_id_seq') THEN
+        CREATE SEQUENCE profile_id_seq OWNED BY profile.id;
+        PERFORM setval('profile_id_seq', GREATEST(COALESCE((SELECT MAX(id) FROM profile), 0), 1));
+        ALTER TABLE profile ALTER COLUMN id SET DEFAULT nextval('profile_id_seq');
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'email_config_id_seq') THEN
+        CREATE SEQUENCE email_config_id_seq OWNED BY email_config.id;
+        PERFORM setval('email_config_id_seq', GREATEST(COALESCE((SELECT MAX(id) FROM email_config), 0), 1));
+        ALTER TABLE email_config ALTER COLUMN id SET DEFAULT nextval('email_config_id_seq');
+      END IF;
+    END $$;
+  `).catch(e => console.warn('Sequence attach skipped:', e.message));
+
   // Unique per-user constraints on single-row tables
   await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS profile_user_id_uniq ON profile(user_id) WHERE user_id IS NOT NULL`);
   await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS email_config_user_id_uniq ON email_config(user_id) WHERE user_id IS NOT NULL`);
