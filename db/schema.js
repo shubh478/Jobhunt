@@ -1,6 +1,17 @@
 const pool = require('./pool');
 
 async function initDB() {
+  // Users table — Phase 1a auth
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      name TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS applications (
       id SERIAL PRIMARY KEY,
@@ -132,6 +143,16 @@ async function initDB() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
+
+  // Phase 1a: nullable user_id columns on every per-user table.
+  // Phase 1b will gate routes by user_id; for now legacy single-tenant code keeps working.
+  const userScopedTables = [
+    'applications', 'profile', 'prep_topics', 'daily_log',
+    'email_config', 'cover_templates', 'follow_ups', 'practice_questions', 'ai_cache'
+  ];
+  for (const t of userScopedTables) {
+    await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE`);
+  }
 
   // Init single-row tables
   await pool.query(`INSERT INTO profile (id, full_name) VALUES (1, '') ON CONFLICT (id) DO NOTHING`);

@@ -1,12 +1,17 @@
 const express = require('express');
 const path = require('path');
+const cookieParser = require('cookie-parser');
 const { initDB } = require('./db/schema');
+const { attachUser } = require('./lib/auth');
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
+app.use(cookieParser());
+app.use(attachUser);
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Mount routes
+app.use('/api', require('./routes/auth'));
 app.use('/api', require('./routes/applications'));
 app.use('/api', require('./routes/profile'));
 app.use('/api', require('./routes/templates'));

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Job Hunt Pro — Sign in</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background:
+      radial-gradient(ellipse at 20% 20%, rgba(99,102,241,0.18), transparent 55%),
+      radial-gradient(ellipse at 80% 80%, rgba(192,132,252,0.15), transparent 55%),
+      #09090b;
+    color: #fafafa;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    letter-spacing: -0.01em;
+  }
+  .card {
+    width: 100%;
+    max-width: 420px;
+    background: rgba(24,24,27,.7);
+    border: 1px solid rgba(63,63,70,.5);
+    border-radius: 20px;
+    padding: 36px 32px;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 30px 80px rgba(0,0,0,.5);
+  }
+  .brand {
+    font-size: 22px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #818cf8, #c084fc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 4px;
+    letter-spacing: -0.02em;
+  }
+  .sub { font-size: 13px; color: #71717a; margin-bottom: 26px; }
+  .tabs { display: flex; gap: 4px; padding: 4px; background: rgba(15,15,17,.6); border-radius: 12px; margin-bottom: 22px; }
+  .tab-btn { flex: 1; padding: 9px 12px; background: transparent; border: none; color: #a1a1aa; font-size: 13px; font-weight: 600; cursor: pointer; border-radius: 9px; font-family: inherit; transition: all .2s; }
+  .tab-btn.active { background: rgba(99,102,241,.18); color: #c7d2fe; }
+  .form { display: none; flex-direction: column; gap: 14px; }
+  .form.active { display: flex; }
+  .field label { display: block; font-size: 11px; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; margin-bottom: 6px; }
+  .field input {
+    width: 100%;
+    padding: 11px 13px;
+    background: rgba(15,15,17,.6);
+    border: 1px solid rgba(63,63,70,.6);
+    border-radius: 10px;
+    color: #fafafa;
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color .2s;
+  }
+  .field input:focus { outline: none; border-color: rgba(129,140,248,.5); }
+  .btn-primary {
+    margin-top: 4px;
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(135deg, #6366f1, #818cf8);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: 0 4px 20px rgba(99,102,241,.3);
+    transition: transform .15s, box-shadow .2s;
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(99,102,241,.45); }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+  .msg { font-size: 12px; padding: 10px 12px; border-radius: 9px; margin-top: 4px; display: none; }
+  .msg.error { display: block; background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.25); color: #fca5a5; }
+  .msg.success { display: block; background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.25); color: #86efac; }
+  .footer-note { margin-top: 22px; font-size: 11px; color: #52525b; text-align: center; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">Job Hunt Pro</div>
+    <div class="sub">Sign in to track 100+ relevant jobs/day</div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="login">Sign in</button>
+      <button class="tab-btn" data-tab="signup">Create account</button>
+    </div>
+
+    <form class="form active" id="form-login" autocomplete="on">
+      <div class="field"><label>Email</label><input type="email" id="login-email" autocomplete="email" required></div>
+      <div class="field"><label>Password</label><input type="password" id="login-password" autocomplete="current-password" required></div>
+      <button class="btn-primary" type="submit" id="login-submit">Sign in</button>
+      <div class="msg" id="login-msg"></div>
+    </form>
+
+    <form class="form" id="form-signup" autocomplete="on">
+      <div class="field"><label>Name</label><input type="text" id="signup-name" autocomplete="name"></div>
+      <div class="field"><label>Email</label><input type="email" id="signup-email" autocomplete="email" required></div>
+      <div class="field"><label>Password (6+ chars)</label><input type="password" id="signup-password" autocomplete="new-password" required minlength="6"></div>
+      <button class="btn-primary" type="submit" id="signup-submit">Create account</button>
+      <div class="msg" id="signup-msg"></div>
+    </form>
+
+    <div class="footer-note">Your data stays on your account. No spam, no resale.</div>
+  </div>
+
+<script>
+  function showMsg(id, text, kind) {
+    var el = document.getElementById(id);
+    el.textContent = text;
+    el.className = 'msg ' + (kind || 'error');
+  }
+
+  document.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+      document.querySelectorAll('.form').forEach(function(f){ f.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById('form-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  async function postJSON(url, body) {
+    var r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(body)
+    });
+    var data = {};
+    try { data = await r.json(); } catch (_) {}
+    return { ok: r.ok, status: r.status, data: data };
+  }
+
+  document.getElementById('form-login').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    var btn = document.getElementById('login-submit');
+    btn.disabled = true; btn.textContent = 'Signing in...';
+    var res = await postJSON('/api/auth/login', {
+      email: document.getElementById('login-email').value,
+      password: document.getElementById('login-password').value
+    });
+    btn.disabled = false; btn.textContent = 'Sign in';
+    if (res.ok) {
+      showMsg('login-msg', 'Welcome back!', 'success');
+      window.location.href = '/';
+    } else {
+      showMsg('login-msg', (res.data && res.data.error) || 'Sign-in failed', 'error');
+    }
+  });
+
+  document.getElementById('form-signup').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    var btn = document.getElementById('signup-submit');
+    btn.disabled = true; btn.textContent = 'Creating account...';
+    var res = await postJSON('/api/auth/signup', {
+      name: document.getElementById('signup-name').value,
+      email: document.getElementById('signup-email').value,
+      password: document.getElementById('signup-password').value
+    });
+    btn.disabled = false; btn.textContent = 'Create account';
+    if (res.ok) {
+      showMsg('signup-msg', 'Account created — redirecting...', 'success');
+      setTimeout(function(){ window.location.href = '/'; }, 600);
+    } else {
+      showMsg('signup-msg', (res.data && res.data.error) || 'Sign-up failed', 'error');
+    }
+  });
+</script>
+</body>
+</html>
