@@ -1493,6 +1493,22 @@ async function scoreQueuedJobs() {
 // Pending bulk apply request — set when SMTP modal is opened so we can resume after save
 var __pendingBulkApply = null;
 
+async function resetAppliedToWishlist() {
+  showConfirm(
+    'Reset all APPLIED → WISHLIST?',
+    'This moves every job currently marked APPLIED back to WISHLIST. Use this if you clicked "Apply" but never actually submitted on the company\'s site. Your data is not deleted — only the status changes.',
+    async function() {
+      try {
+        var r = await api('/api/applications/reset-applied-to-wishlist', 'POST', {});
+        toast('Reset ' + r.reset + ' jobs back to WISHLIST');
+        try { loadAutomation(); } catch {}
+        try { loadDashboard(); } catch {}
+        try { loadApplications(); } catch {}
+      } catch (e) {}
+    }
+  );
+}
+
 async function bulkApply() {
   var selectedIds = [];
   document.querySelectorAll('.queue-checkbox:checked').forEach(function(c) {

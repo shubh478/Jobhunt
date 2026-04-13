@@ -388,10 +388,13 @@
       <div id="auto-queue-list" style="max-height:400px;overflow-y:auto"></div>
     </div>
 
-    <!-- Step 3: Bulk Apply -->
+    <!-- Step 3: Bulk Mark + Optional Email -->
     <div class="settings-section">
-      <h3>Step 3: Bulk Apply</h3>
-      <p style="font-size:12px;color:#64748b;margin-bottom:10px">Auto-generate cover letters and mark as APPLIED. Optionally send emails if HR email is in notes.</p>
+      <h3>Step 3: Bulk Mark as Applied <span style="font-size:11px;color:#fbbf24;font-weight:500">(tracker only — does NOT submit to companies)</span></h3>
+      <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:10px;padding:11px 13px;margin-bottom:12px;font-size:12px;color:#fcd34d">
+        ⚠ <strong>This is a tracker, not auto-apply.</strong> Clicking the button below only updates the status in your Job Hunt Pro database. It does NOT submit your application to LinkedIn, Indeed, Workday, or company portals. To actually apply, use <strong>⚡ Apply with Helper</strong> on each job from the Job Search tab.
+        <br>The "Send Email" option below only emails recruiters if their email was scraped into the job's notes (rare — usually only ~5% of jobs).
+      </div>
       <div class="form-row">
         <div class="form-group">
           <label>Cover Letter Template</label>
@@ -406,7 +409,8 @@
         </div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <button class="btn btn-primary" onclick="bulkApply()" id="bulk-apply-btn">Apply to Selected Jobs</button>
+        <button class="btn btn-primary" onclick="bulkApply()" id="bulk-apply-btn">Mark Selected as APPLIED</button>
+        <button class="btn btn-warn" onclick="resetAppliedToWishlist()" style="margin-left:auto">↺ Reset all APPLIED → WISHLIST</button>
         <span id="auto-apply-status" style="font-size:13px;color:#94a3b8"></span>
       </div>
       <div id="auto-apply-results" style="margin-top:12px"></div>

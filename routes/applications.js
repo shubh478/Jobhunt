@@ -60,6 +60,21 @@ router.post('/applications/bulk-status', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Reset APPLIED applications back to WISHLIST — for users who clicked "Apply"
+// thinking it actually submitted, then realized it only updated the tracker.
+router.post('/applications/reset-applied-to-wishlist', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE applications
+       SET status='WISHLIST', applied_date='', follow_up_date='', updated_at=NOW()
+       WHERE user_id=$1 AND status='APPLIED'
+       RETURNING id, company, role`,
+      [req.userId]
+    );
+    res.json({ ok: true, reset: result.rows.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 router.post('/auto-ghost', async (req, res) => {
   try {
     const result = await pool.query(
