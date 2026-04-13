@@ -1,5 +1,32 @@
 const express = require('express');
 const router = express.Router();
+const { GREENHOUSE, LEVER, ASHBY } = require('../lib/ats-companies');
+
+// Helper: fetch with timeout so one slow ATS doesn't block the whole search
+function fetchWithTimeout(url, options = {}, ms = 4000) {
+  return fetch(url, { ...options, signal: AbortSignal.timeout(ms) });
+}
+
+// Tokenize a keyword string into lowercase terms for substring matching
+function kwTokens(keywords) {
+  return (keywords || '').toLowerCase().split(/[\s,]+/).filter(t => t.length > 2);
+}
+
+// Check if a job title or description matches the keyword tokens
+function jobMatchesKeywords(title, desc, tokens) {
+  if (!tokens.length) return true;
+  const hay = ((title || '') + ' ' + (desc || '')).toLowerCase();
+  return tokens.some(t => hay.includes(t));
+}
+
+// Check if a job's location string matches the location filter
+function jobMatchesLocation(jobLoc, locFilter) {
+  if (!locFilter) return true;
+  const lf = locFilter.toLowerCase();
+  const loc = (jobLoc || '').toLowerCase();
+  // Remote jobs are always OK; otherwise require location substring match
+  return /remote|anywhere|worldwide/.test(loc) || loc.includes(lf);
+}
 
 // Multi-source job search (5 sources)
 router.get('/auto/search-jobs', async (req, res) => {
@@ -156,6 +183,99 @@ router.get('/auto/search-jobs', async (req, res) => {
       .catch(e => errors.push('Jobicy: ' + e.message))
   );
 
+  // Source 6: Greenhouse public Job Board API — direct company listings, no aggregator
+  const kwToks = kwTokens(keywords);
+  GREENHOUSE.forEach(slug => {
+    fetches.push(
+      fetchWithTimeout(`https://boards-api.greenhouse.io/v1/boards/${slug}/jobs?content=true`, {}, 4500)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!data || !data.jobs) return;
+          data.jobs.forEach(j => {
+            const title = j.title || '';
+            const jobLoc = (j.location && j.location.name) || 'Remote';
+            const plainDesc = (j.content || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+            if (!jobMatchesKeywords(title, plainDesc, kwToks)) return;
+            if (!jobMatchesLocation(jobLoc, location)) return;
+            results.push({
+              title,
+              company: (j.company_name || slug).replace(/\b\w/g, c => c.toUpperCase()),
+              location: jobLoc,
+              salary: '',
+              url: j.absolute_url,
+              source: 'Greenhouse',
+              tags: (j.departments || []).map(d => d.name).filter(Boolean).slice(0, 3),
+              posted: j.updated_at || '',
+              description: plainDesc.substring(0, 1500)
+            });
+          });
+        })
+        .catch(e => { /* single company failure is fine; don't pollute errors array */ })
+    );
+  });
+
+  // Source 7: Lever public Postings API — direct company listings
+  LEVER.forEach(slug => {
+    fetches.push(
+      fetchWithTimeout(`https://api.lever.co/v0/postings/${slug}?mode=json`, {}, 4500)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!Array.isArray(data)) return;
+          data.forEach(j => {
+            const title = j.text || '';
+            const jobLoc = (j.categories && j.categories.location) || 'Remote';
+            const plainDesc = ((j.descriptionPlain || j.description || '') + ' ' +
+                               (Array.isArray(j.lists) ? j.lists.map(l => l.text + ' ' + l.content).join(' ') : ''))
+                               .replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+            if (!jobMatchesKeywords(title, plainDesc, kwToks)) return;
+            if (!jobMatchesLocation(jobLoc, location)) return;
+            results.push({
+              title,
+              company: slug.replace(/\b\w/g, c => c.toUpperCase()),
+              location: jobLoc,
+              salary: '',
+              url: j.hostedUrl || j.applyUrl || '',
+              source: 'Lever',
+              tags: [(j.categories && j.categories.team) || '', (j.categories && j.categories.commitment) || ''].filter(Boolean),
+              posted: j.createdAt ? new Date(j.createdAt).toISOString() : '',
+              description: plainDesc.substring(0, 1500)
+            });
+          });
+        })
+        .catch(e => { /* ignore per-company */ })
+    );
+  });
+
+  // Source 8: Ashby public job board API
+  ASHBY.forEach(slug => {
+    fetches.push(
+      fetchWithTimeout(`https://api.ashbyhq.com/posting-api/job-board/${slug}?includeCompensation=true`, {}, 4500)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!data || !data.jobs) return;
+          data.jobs.forEach(j => {
+            const title = j.title || '';
+            const jobLoc = j.location || j.address?.postalAddress?.addressLocality || 'Remote';
+            const plainDesc = ((j.descriptionPlain || '') + ' ' + (j.descriptionHtml || '').replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
+            if (!jobMatchesKeywords(title, plainDesc, kwToks)) return;
+            if (!jobMatchesLocation(jobLoc, location)) return;
+            results.push({
+              title,
+              company: (data.apiVersion && data.jobs[0]?.organizationId ? slug : slug).replace(/\b\w/g, c => c.toUpperCase()),
+              location: jobLoc,
+              salary: j.compensationTierSummary || '',
+              url: j.jobUrl || j.applyUrl || '',
+              source: 'Ashby',
+              tags: [j.employmentType, j.team].filter(Boolean),
+              posted: j.publishedAt || '',
+              description: plainDesc.substring(0, 1500)
+            });
+          });
+        })
+        .catch(e => { /* ignore per-company */ })
+    );
+  });
+
   // Wait for all sources in parallel
   await Promise.allSettled(fetches);
 
@@ -178,7 +298,10 @@ router.get('/auto/search-jobs', async (req, res) => {
       adzuna: !!process.env.ADZUNA_APP_ID,
       jsearch: !!process.env.RAPIDAPI_KEY,
       remoteok: true,
-      jobicy: true
+      jobicy: true,
+      greenhouse: true,
+      lever: true,
+      ashby: true
     }
   });
 });
