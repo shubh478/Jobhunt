@@ -7,7 +7,7 @@ const { getAvailableProviders, getFirstAvailable, generate, cacheKey } = require
 router.get('/ai/providers', async (req, res) => {
   try {
     const providers = getAvailableProviders();
-    const profileResult = await pool.query('SELECT ai_provider FROM profile WHERE id=1');
+    const profileResult = await pool.query('SELECT ai_provider FROM profile WHERE user_id=$1', [req.userId]);
     const active = profileResult.rows[0]?.ai_provider || 'gemini';
     res.json({ providers, active });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -21,7 +21,7 @@ router.put('/ai/provider', async (req, res) => {
     const p = providers.find(x => x.id === provider);
     if (!p) return res.status(400).json({ error: 'Unknown provider' });
     if (!p.available) return res.status(400).json({ error: `${p.name} API key not configured. Add ${provider === 'gemini' ? 'GEMINI_API_KEY' : provider === 'groq' ? 'GROQ_API_KEY' : provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY'} to your environment variables.` });
-    await pool.query('UPDATE profile SET ai_provider=$1 WHERE id=1', [provider]);
+    await pool.query('UPDATE profile SET ai_provider=$1 WHERE user_id=$2', [provider, req.userId]);
     res.json({ ok: true, provider });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -29,7 +29,7 @@ router.put('/ai/provider', async (req, res) => {
 // Test AI connection
 router.post('/ai/test', async (req, res) => {
   try {
-    const profileResult = await pool.query('SELECT ai_provider FROM profile WHERE id=1');
+    const profileResult = await pool.query('SELECT ai_provider FROM profile WHERE user_id=$1', [req.userId]);
     const preferred = profileResult.rows[0]?.ai_provider || 'gemini';
     const providerId = getFirstAvailable(preferred);
     if (!providerId) return res.status(400).json({ error: 'No AI provider configured. Add GEMINI_API_KEY (free) to your environment variables.' });
@@ -47,7 +47,7 @@ router.post('/ai/generate-cover', async (req, res) => {
     const { company, role, job_description, tone } = req.body;
     if (!company || !role) return res.status(400).json({ error: 'Company and role required' });
 
-    const profileResult = await pool.query('SELECT * FROM profile WHERE id=1');
+    const profileResult = await pool.query('SELECT * FROM profile WHERE user_id=$1', [req.userId]);
     const profile = profileResult.rows[0];
     if (!profile || !profile.full_name) return res.status(400).json({ error: 'Set up your profile in Settings first' });
 
@@ -57,7 +57,7 @@ router.post('/ai/generate-cover', async (req, res) => {
 
     // Check cache
     const key = cacheKey({ company, role, job_description, skills: profile.skills, tone });
-    const cached = await pool.query('SELECT response FROM ai_cache WHERE cache_key=$1', [key]);
+    const cached = await pool.query('SELECT response FROM ai_cache WHERE cache_key=$1 AND user_id=$2', [key, req.userId]);
     if (cached.rows.length > 0) {
       try {
         const parsed = JSON.parse(cached.rows[0].response);
@@ -118,8 +118,8 @@ Requirements:
 
     // Cache the response
     await pool.query(
-      'INSERT INTO ai_cache (cache_key, response, provider) VALUES ($1, $2, $3) ON CONFLICT (cache_key) DO UPDATE SET response=$2, provider=$3',
-      [key, JSON.stringify({ subject, body }), providerId]
+      'INSERT INTO ai_cache (user_id, cache_key, response, provider) VALUES ($1, $2, $3, $4) ON CONFLICT (cache_key) DO UPDATE SET response=$3, provider=$4, user_id=$1',
+      [req.userId, key, JSON.stringify({ subject, body }), providerId]
     );
 
     res.json({ subject, body, provider: providerId, cached: false });
@@ -134,7 +134,7 @@ router.post('/ai/generate-cold-email', async (req, res) => {
     const { company, role, job_description, recipient_name } = req.body;
     if (!company || !role) return res.status(400).json({ error: 'Company and role required' });
 
-    const profileResult = await pool.query('SELECT * FROM profile WHERE id=1');
+    const profileResult = await pool.query('SELECT * FROM profile WHERE user_id=$1', [req.userId]);
     const profile = profileResult.rows[0];
     const preferred = profile?.ai_provider || 'gemini';
     const providerId = getFirstAvailable(preferred);
@@ -182,7 +182,7 @@ router.post('/ai/match-score', async (req, res) => {
     const { job_title, job_description, application_id } = req.body;
     if (!job_title) return res.status(400).json({ error: 'Job title required' });
 
-    const profileResult = await pool.query('SELECT * FROM profile WHERE id=1');
+    const profileResult = await pool.query('SELECT * FROM profile WHERE user_id=$1', [req.userId]);
     const profile = profileResult.rows[0];
     const preferred = profile?.ai_provider || 'gemini';
     const providerId = getFirstAvailable(preferred);
@@ -217,8 +217,8 @@ Score 0-100 based on skills match, experience level, and role fit.`;
     // Save score to application if ID provided
     if (application_id) {
       await pool.query(
-        'UPDATE applications SET match_score=$1, match_reasons=$2 WHERE id=$3',
-        [result.score, JSON.stringify(result), application_id]
+        'UPDATE applications SET match_score=$1, match_reasons=$2 WHERE id=$3 AND user_id=$4',
+        [result.score, JSON.stringify(result), application_id, req.userId]
       );
     }
 
@@ -231,13 +231,13 @@ Score 0-100 based on skills match, experience level, and role fit.`;
 // Bulk score WISHLIST jobs
 router.post('/ai/bulk-score', async (req, res) => {
   try {
-    const profileResult = await pool.query('SELECT * FROM profile WHERE id=1');
+    const profileResult = await pool.query('SELECT * FROM profile WHERE user_id=$1', [req.userId]);
     const profile = profileResult.rows[0];
     const preferred = profile?.ai_provider || 'gemini';
     const providerId = getFirstAvailable(preferred);
     if (!providerId) return res.status(400).json({ error: 'No AI provider configured.' });
 
-    const jobs = await pool.query("SELECT id, company, role, notes FROM applications WHERE status='WISHLIST' AND match_score IS NULL LIMIT 20");
+    const jobs = await pool.query("SELECT id, company, role, notes FROM applications WHERE user_id=$1 AND status='WISHLIST' AND match_score IS NULL LIMIT 20", [req.userId]);
     const results = [];
 
     for (const job of jobs.rows) {
@@ -249,8 +249,8 @@ router.post('/ai/bulk-score', async (req, res) => {
         const cleaned = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
         const parsed = JSON.parse(cleaned);
 
-        await pool.query('UPDATE applications SET match_score=$1, match_reasons=$2 WHERE id=$3',
-          [parsed.score, JSON.stringify(parsed), job.id]);
+        await pool.query('UPDATE applications SET match_score=$1, match_reasons=$2 WHERE id=$3 AND user_id=$4',
+          [parsed.score, JSON.stringify(parsed), job.id, req.userId]);
         results.push({ id: job.id, company: job.company, role: job.role, score: parsed.score });
       } catch (e) {
         results.push({ id: job.id, company: job.company, role: job.role, score: null, error: e.message });
@@ -269,11 +269,11 @@ router.post('/ai/interview-prep', async (req, res) => {
     const { application_id } = req.body;
     if (!application_id) return res.status(400).json({ error: 'Application ID required' });
 
-    const jobResult = await pool.query('SELECT * FROM applications WHERE id=$1', [application_id]);
+    const jobResult = await pool.query('SELECT * FROM applications WHERE id=$1 AND user_id=$2', [application_id, req.userId]);
     if (jobResult.rows.length === 0) return res.status(404).json({ error: 'Application not found' });
     const job = jobResult.rows[0];
 
-    const profileResult = await pool.query('SELECT * FROM profile WHERE id=1');
+    const profileResult = await pool.query('SELECT * FROM profile WHERE user_id=$1', [req.userId]);
     const profile = profileResult.rows[0];
     const preferred = profile?.ai_provider || 'gemini';
     const providerId = getFirstAvailable(preferred);
@@ -307,8 +307,8 @@ Make questions specific to this company and role, not generic.`;
     const saved = [];
     for (const q of questions) {
       const result = await pool.query(
-        'INSERT INTO practice_questions (application_id, category, question, suggested_answer, difficulty) VALUES ($1,$2,$3,$4,$5) RETURNING id',
-        [application_id, q.category || 'technical', q.question, q.suggested_answer || '', q.difficulty || 'MEDIUM']
+        'INSERT INTO practice_questions (user_id, application_id, category, question, suggested_answer, difficulty) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
+        [req.userId, application_id, q.category || 'technical', q.question, q.suggested_answer || '', q.difficulty || 'MEDIUM']
       );
       saved.push({ id: result.rows[0].id, ...q });
     }
@@ -325,8 +325,9 @@ router.get('/ai/usage', async (req, res) => {
     const result = await pool.query(
       `SELECT provider, COUNT(*) as calls, SUM(tokens_used) as total_tokens
        FROM ai_cache
-       WHERE created_at >= date_trunc('month', CURRENT_DATE)
-       GROUP BY provider`
+       WHERE user_id=$1 AND created_at >= date_trunc('month', CURRENT_DATE)
+       GROUP BY provider`,
+      [req.userId]
     );
     res.json({ usage: result.rows });
   } catch (err) { res.status(500).json({ error: err.message }); }

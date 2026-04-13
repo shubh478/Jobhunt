@@ -34,10 +34,14 @@ function toast(msg, isError) {
 
 async function api(url, method, body) {
   method = method || 'GET';
-  var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
+  var opts = { method: method, headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin' };
   if (body) opts.body = JSON.stringify(body);
   try {
     var res = await fetch(url, opts);
+    if (res.status === 401) {
+      window.location.href = '/login.html';
+      throw new Error('Login required');
+    }
     var text = await res.text();
     var data;
     try { data = JSON.parse(text); } catch (e) {
@@ -48,12 +52,17 @@ async function api(url, method, body) {
     if (data.error && !res.ok) { toast(data.error, true); throw new Error(data.error); }
     return data;
   } catch (e) {
-    if (e.message === 'Invalid response from server') throw e;
+    if (e.message === 'Invalid response from server' || e.message === 'Login required') throw e;
     if (e.message && e.message.includes('Failed to fetch')) {
       toast('Cannot reach server — check your connection', true);
     }
     throw e;
   }
+}
+
+async function logoutUser() {
+  try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }); } catch {}
+  window.location.href = '/login.html';
 }
 
 function esc(s) {
@@ -1529,5 +1538,13 @@ async function bulkApply() {
 }
 
 // ============================== INIT ==============================
+async function showCurrentUser() {
+  try {
+    var me = await api('/api/auth/me');
+    var el = document.getElementById('nav-user-email');
+    if (el && me) el.textContent = me.email || me.name || '';
+  } catch {}
+}
+showCurrentUser();
 loadDashboard();
 renderResources();

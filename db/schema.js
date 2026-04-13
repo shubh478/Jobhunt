@@ -144,8 +144,7 @@ async function initDB() {
     )
   `);
 
-  // Phase 1a: nullable user_id columns on every per-user table.
-  // Phase 1b will gate routes by user_id; for now legacy single-tenant code keeps working.
+  // Phase 1a/1b: per-user data isolation
   const userScopedTables = [
     'applications', 'profile', 'prep_topics', 'daily_log',
     'email_config', 'cover_templates', 'follow_ups', 'practice_questions', 'ai_cache'
@@ -154,9 +153,32 @@ async function initDB() {
     await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE`);
   }
 
-  // Init single-row tables
-  await pool.query(`INSERT INTO profile (id, full_name) VALUES (1, '') ON CONFLICT (id) DO NOTHING`);
-  await pool.query(`INSERT INTO email_config (id, smtp_host) VALUES (1, 'smtp.gmail.com') ON CONFLICT (id) DO NOTHING`);
+  // Drop the legacy CHECK (id = 1) constraints on profile + email_config so new users get rows.
+  await pool.query(`
+    DO $$
+    DECLARE r RECORD;
+    BEGIN
+      FOR r IN SELECT conname, conrelid::regclass::text AS tbl FROM pg_constraint
+               WHERE conrelid IN ('profile'::regclass, 'email_config'::regclass)
+                 AND contype = 'c'
+      LOOP
+        EXECUTE format('ALTER TABLE %I DROP CONSTRAINT %I', r.tbl, r.conname);
+      END LOOP;
+    END $$;
+  `).catch(e => console.warn('Drop check constraint skipped:', e.message));
+
+  // Unique per-user constraints on single-row tables
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS profile_user_id_uniq ON profile(user_id) WHERE user_id IS NOT NULL`);
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS email_config_user_id_uniq ON email_config(user_id) WHERE user_id IS NOT NULL`);
+
+  // Indexes for query performance on per-user reads
+  for (const t of ['applications', 'prep_topics', 'daily_log', 'cover_templates', 'follow_ups', 'practice_questions']) {
+    await pool.query(`CREATE INDEX IF NOT EXISTS ${t}_user_id_idx ON ${t}(user_id)`);
+  }
+
+  // Legacy single-row seed (will be inherited by first signup via Phase 1a migration)
+  await pool.query(`INSERT INTO profile (id, full_name) VALUES (1, '') ON CONFLICT DO NOTHING`).catch(() => {});
+  await pool.query(`INSERT INTO email_config (id, smtp_host) VALUES (1, 'smtp.gmail.com') ON CONFLICT DO NOTHING`).catch(() => {});
 
   // Seed prep topics if empty
   const count = await pool.query('SELECT COUNT(*) as c FROM prep_topics');
