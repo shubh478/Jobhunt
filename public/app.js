@@ -433,6 +433,77 @@ document.getElementById('search-keywords').addEventListener('input', updatePorta
 document.getElementById('search-location').addEventListener('input', updatePortalLinks);
 document.getElementById('search-keywords').addEventListener('keydown', function(e) { if (e.key === 'Enter') searchJobs(); });
 
+async function updateExpFilterHint() {
+  var hintEl = document.getElementById('exp-filter-hint');
+  if (!hintEl) return;
+  var p = await getProfileForScoring();
+  if (!p || !p.years) {
+    hintEl.textContent = 'Set "Experience years" in your profile (Settings → Your Profile) for smart filtering.';
+    return;
+  }
+  var modeEl = document.getElementById('exp-filter-mode');
+  var mode = modeEl ? modeEl.value : 'smart';
+  var msg = 'Your profile says ' + p.years.toFixed(1) + ' years.';
+  if (mode === 'smart') msg += ' Smart filter hides senior/staff/lead jobs and any job requiring more than ' + Math.ceil(p.years + 1.5) + ' years.';
+  else if (mode === 'strict') msg += ' Strict filter only keeps jobs with explicit ranges that include your years (no overqualified jobs either).';
+  else msg += ' Filter disabled — all jobs shown.';
+  hintEl.textContent = msg;
+}
+document.getElementById('exp-filter-mode').addEventListener('change', updateExpFilterHint);
+// Refresh hint whenever the user enters Job Search tab — also runs once on init
+setTimeout(updateExpFilterHint, 500);
+
+// Parse experience strings into a decimal number of years.
+// Handles: "2", "1.8", "1 year 8 months", "20 months", "2 yrs", "1y 8m", "1.5 years"
+function parseExperienceYears(str) {
+  if (!str) return 0;
+  var s = String(str).toLowerCase().trim();
+  if (!s) return 0;
+
+  // "1 year 8 months" / "1y 8m" / "1 yr 8 mo"
+  var combo = s.match(/(\d+)\s*(?:y(?:ear)?s?|yrs?)\s*(\d+)\s*(?:m(?:onth)?s?|mos?)/);
+  if (combo) return parseInt(combo[1]) + parseInt(combo[2]) / 12;
+
+  // "20 months" / "8 mo"
+  var monthsOnly = s.match(/^(\d+)\s*(?:m(?:onth)?s?|mos?)$/);
+  if (monthsOnly) return parseInt(monthsOnly[1]) / 12;
+
+  // "2 years" / "1.5 years" / "2 yrs"
+  var yearsOnly = s.match(/(\d+(?:\.\d+)?)\s*(?:y(?:ear)?s?|yrs?)/);
+  if (yearsOnly) return parseFloat(yearsOnly[1]);
+
+  // Bare number "2" or "1.8"
+  var bare = s.match(/^(\d+(?:\.\d+)?)$/);
+  if (bare) return parseFloat(bare[1]);
+
+  return 0;
+}
+
+// Detect the experience requirement in a job description.
+// Returns { min, max } in years, or null if no requirement found.
+// Examples: "3+ years" → {min:3, max:Infinity}, "2-5 years" → {min:2, max:5}
+function parseJobYearRequirement(text) {
+  if (!text) return null;
+  var t = text.toLowerCase();
+
+  // "2-5 years" / "2 to 5 years"
+  var range = t.match(/(\d{1,2})\s*(?:to|-|–)\s*(\d{1,2})\s*\+?\s*(?:years|yrs)/);
+  if (range) return { min: parseInt(range[1]), max: parseInt(range[2]) };
+
+  // "3+ years" / "minimum 3 years" / "at least 3 years"
+  var plus = t.match(/(?:minimum|min|at\s*least|over)\s*(\d{1,2})\s*\+?\s*(?:years|yrs)/);
+  if (plus) return { min: parseInt(plus[1]), max: Infinity };
+
+  var plusBare = t.match(/(\d{1,2})\s*\+\s*(?:years|yrs)/);
+  if (plusBare) return { min: parseInt(plusBare[1]), max: Infinity };
+
+  // "3 years of experience"
+  var simple = t.match(/(\d{1,2})\s*(?:years|yrs)\s*(?:of\s*)?(?:experience|exp)/);
+  if (simple) return { min: parseInt(simple[1]), max: parseInt(simple[1]) + 3 };
+
+  return null;
+}
+
 var __profileCache = null;
 async function getProfileForScoring() {
   if (__profileCache) return __profileCache;
@@ -440,7 +511,7 @@ async function getProfileForScoring() {
     var p = await api('/api/profile');
     __profileCache = {
       skills: (p.skills || '').toLowerCase().split(/[,;|\n]/).map(function(s){return s.trim();}).filter(function(s){return s.length>1;}),
-      years: parseInt(p.experience_years) || 0,
+      years: parseExperienceYears(p.experience_years),
       currentRole: (p.current_role || '').toLowerCase(),
       summary: (p.summary || '').toLowerCase()
     };
@@ -448,6 +519,45 @@ async function getProfileForScoring() {
     __profileCache = { skills: [], years: 0, currentRole: '', summary: '' };
   }
   return __profileCache;
+}
+
+// Given a job and the user's years, decide if it's a fit.
+// Returns: { keep: boolean, reason: string }
+// Tolerance: user with X years matches jobs requiring [X-1, X+2] years.
+// Senior/Lead/Staff/Principal titles auto-rejected if user has < 4 years (unless explicitly OK).
+// Junior/Intern titles auto-rejected if user has > 5 years.
+function fitsExperience(job, userYears, strict) {
+  if (!userYears) return { keep: true, reason: '' };
+
+  var title = (job.title || '').toLowerCase();
+  var desc = (job.description || '').toLowerCase();
+  var hay = title + ' ' + desc;
+
+  // Title-level seniority filter
+  var seniorTitle = /\b(senior|sr\.|staff|principal|lead|architect|head\s+of|director|vp\b|chief)\b/.test(title);
+  var juniorTitle = /\b(junior|jr\.|intern|trainee|fresher|entry[-\s]*level|graduate|apprentice)\b/.test(title);
+
+  if (seniorTitle && userYears < 4) {
+    return { keep: false, reason: 'senior title (you have ' + userYears.toFixed(1) + ' yrs)' };
+  }
+  if (juniorTitle && userYears > 5) {
+    return { keep: false, reason: 'junior title (you have ' + userYears.toFixed(1) + ' yrs)' };
+  }
+
+  // Year-requirement filter from JD text
+  var req = parseJobYearRequirement(hay);
+  if (req) {
+    // Allow user to be up to 1.5 years short OR within range
+    if (userYears < req.min - 1.5) {
+      return { keep: false, reason: 'needs ' + req.min + '+ yrs (you have ' + userYears.toFixed(1) + ')' };
+    }
+    if (strict && req.max !== Infinity && userYears > req.max + 3) {
+      return { keep: false, reason: 'overqualified (' + req.min + '-' + req.max + ' yrs)' };
+    }
+    job._yearReq = req;
+  }
+
+  return { keep: true, reason: '' };
 }
 
 function scoreJob(job, kwTokens, locToken, profile) {
@@ -481,26 +591,16 @@ function scoreJob(job, kwTokens, locToken, profile) {
       reasons.push('role');
     }
 
-    // Experience-level match — penalize jobs that are way out of range
+    // Experience-level scoring (filtering happens separately via fitsExperience)
     if (profile.years > 0) {
-      var rangeMatch = hay.match(/(\d{1,2})\s*\+?\s*(?:to|-)?\s*(\d{1,2})?\s*(?:years|yrs)/);
-      if (rangeMatch) {
-        var minY = parseInt(rangeMatch[1]);
-        var maxY = parseInt(rangeMatch[2]) || (minY + 5);
-        if (profile.years >= minY - 1 && profile.years <= maxY + 2) {
-          score += 5;
+      var req = job._yearReq || parseJobYearRequirement(hay);
+      if (req) {
+        var maxBound = req.max === Infinity ? req.min + 5 : req.max;
+        if (profile.years >= req.min - 0.5 && profile.years <= maxBound + 1) {
+          score += 8;
           reasons.push('yrs✓');
-        } else if (profile.years < minY - 2) {
-          score -= 8; // way under-qualified
-        } else if (profile.years > maxY + 4) {
-          score -= 3; // overqualified
         }
       }
-
-      var seniorWords = ['senior', 'staff', 'principal', 'lead', 'architect'];
-      var juniorWords = ['junior', 'intern', 'entry', 'graduate', 'fresher'];
-      if (profile.years <= 2 && seniorWords.some(function(w){return title.includes(w);})) score -= 6;
-      if (profile.years >= 5 && juniorWords.some(function(w){return title.includes(w);})) score -= 4;
     }
   }
 
@@ -535,16 +635,33 @@ async function searchJobs() {
     var profile = await profilePromise;
     var appliedKeys = await appliedKeysPromise;
 
-    // Merge + dedup across keywords
+    // Read experience filter controls
+    var expFilterEl = document.getElementById('exp-filter-mode');
+    var expMode = expFilterEl ? expFilterEl.value : 'smart'; // 'off' | 'smart' | 'strict'
+
+    // Merge + dedup + filter across keywords
     var seen = {};
     var allJobs = [];
     var allErrors = [];
     var sourcesUsed = {};
+    var filteredOut = 0;
+    var filterReasons = {};
     responses.forEach(function(data) {
       (data.jobs || []).forEach(function(j) {
         var key = ((j.company || '') + '|' + (j.title || '')).toLowerCase();
         if (seen[key]) return;
         seen[key] = 1;
+
+        // Experience filter (skip if mode = off or no profile years)
+        if (expMode !== 'off' && profile && profile.years > 0) {
+          var fit = fitsExperience(j, profile.years, expMode === 'strict');
+          if (!fit.keep) {
+            filteredOut++;
+            filterReasons[fit.reason] = (filterReasons[fit.reason] || 0) + 1;
+            return;
+          }
+        }
+
         j._score = scoreJob(j, kwTokens, locToken, profile);
         allJobs.push(j);
       });
@@ -557,6 +674,10 @@ async function searchJobs() {
     var elapsed = ((Date.now() - t0) / 1000).toFixed(1);
 
     var srcInfo = 'Sources: ' + Object.keys(sourcesUsed).join(', ') + ' | ' + elapsed + 's';
+    if (filteredOut > 0) {
+      var topReasons = Object.entries(filterReasons).sort(function(a,b){return b[1]-a[1];}).slice(0, 2).map(function(e){return e[1] + ' ' + e[0];}).join(', ');
+      srcInfo += ' | Filtered ' + filteredOut + ' (' + topReasons + ')';
+    }
     var uniqErrors = allErrors.filter(function(e, i, a) { return a.indexOf(e) === i; });
     if (uniqErrors.length) srcInfo += ' | Errors: ' + uniqErrors.slice(0, 3).join('; ');
 
@@ -1151,6 +1272,7 @@ async function saveProfile() {
   var resumeTextEl = document.getElementById('s-resume-text');
   if (resumeTextEl) body.resume_text = resumeTextEl.value.trim();
   await api('/api/profile', 'PUT', body);
+  __profileCache = null; // bust cache so search re-reads new years/skills next time
   toast('Profile saved');
 }
 
