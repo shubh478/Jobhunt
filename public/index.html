@@ -764,6 +764,33 @@
   </div>
 </div>
 
+<!-- Just-in-time SMTP setup modal — opened from Bulk Apply when SMTP isn't configured -->
+<div class="modal-overlay" id="smtp-modal">
+  <div class="modal" style="max-width:480px">
+    <h2>Set up email sending</h2>
+    <p style="color:#94a3b8;margin:6px 0 14px;font-size:13px">
+      You asked to send emails with this bulk apply, but SMTP isn't configured yet.
+      Add it once and it's saved for all future runs.
+    </p>
+    <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:10px;padding:11px 13px;margin-bottom:14px;font-size:12px;color:#fcd34d">
+      <strong>Gmail users:</strong> use a <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:#fbbf24;text-decoration:underline">Google App Password</a>, not your real Gmail password.
+      Requires 2-Step Verification on your Google account → "App passwords" → "Mail" → copy the 16-char code.
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>SMTP Host</label><input id="smtp-modal-host" placeholder="smtp.gmail.com" value="smtp.gmail.com"></div>
+      <div class="form-group"><label>Port</label><input id="smtp-modal-port" type="number" placeholder="587" value="587"></div>
+    </div>
+    <div class="form-group"><label>SMTP User (your email)</label><input id="smtp-modal-user" type="email" placeholder="you@gmail.com" autocomplete="email"></div>
+    <div class="form-group"><label>SMTP Password (App Password)</label><input id="smtp-modal-pass" type="password" placeholder="16-character app password" autocomplete="current-password"></div>
+    <div class="form-group"><label>From Name (optional)</label><input id="smtp-modal-fromname" placeholder="Your Name"></div>
+    <div id="smtp-modal-error" style="color:#f87171;font-size:12px;margin-bottom:8px;display:none"></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="skipSmtpAndContinue()">Skip — apply without email</button>
+      <button class="btn btn-primary" id="smtp-modal-save-btn" onclick="saveSmtpAndContinue()">Save & Continue</button>
+    </div>
+  </div>
+</div>
+
 <!-- Confirm Modal -->
 <div class="modal-overlay" id="confirm-modal">
   <div class="modal" style="max-width:400px;text-align:center">

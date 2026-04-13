@@ -1490,6 +1490,9 @@ async function scoreQueuedJobs() {
   }
 }
 
+// Pending bulk apply request — set when SMTP modal is opened so we can resume after save
+var __pendingBulkApply = null;
+
 async function bulkApply() {
   var selectedIds = [];
   document.querySelectorAll('.queue-checkbox:checked').forEach(function(c) {
@@ -1504,6 +1507,82 @@ async function bulkApply() {
   var sendEmail = document.getElementById('auto-send-email').checked;
   var useAI = document.getElementById('auto-use-ai') ? document.getElementById('auto-use-ai').checked : false;
 
+  // If user wants email but SMTP isn't configured, ask now (just-in-time setup)
+  if (sendEmail) {
+    try {
+      var cfg = await api('/api/email-config');
+      if (!cfg || !cfg.smtp_user || !cfg.smtp_user.includes('@')) {
+        __pendingBulkApply = { selectedIds: selectedIds, templateId: templateId, useAI: useAI };
+        // Pre-fill the user field with their profile email if known
+        try {
+          var p = await api('/api/profile');
+          if (p && p.email) document.getElementById('smtp-modal-user').value = p.email;
+          if (p && p.full_name) document.getElementById('smtp-modal-fromname').value = p.full_name;
+        } catch {}
+        document.getElementById('smtp-modal-error').style.display = 'none';
+        document.getElementById('smtp-modal').classList.add('open');
+        return; // Will be resumed by saveSmtpAndContinue() or skipped by closing the modal
+      }
+    } catch (e) {
+      // If GET fails for any reason, fall through and let the bulk apply itself report it
+    }
+  }
+
+  doBulkApply(selectedIds, templateId, sendEmail, useAI);
+}
+
+async function saveSmtpAndContinue() {
+  var btn = document.getElementById('smtp-modal-save-btn');
+  var errEl = document.getElementById('smtp-modal-error');
+  errEl.style.display = 'none';
+
+  var host = document.getElementById('smtp-modal-host').value.trim() || 'smtp.gmail.com';
+  var port = parseInt(document.getElementById('smtp-modal-port').value) || 587;
+  var user = document.getElementById('smtp-modal-user').value.trim();
+  var pass = document.getElementById('smtp-modal-pass').value;
+  var fromName = document.getElementById('smtp-modal-fromname').value.trim();
+
+  if (!user || !user.includes('@')) {
+    errEl.textContent = 'Please enter a valid email address';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (!pass || pass.length < 6) {
+    errEl.textContent = 'Please enter your app password (Gmail: 16 characters)';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = 'Saving...';
+  try {
+    await api('/api/email-config', 'PUT', {
+      smtp_host: host,
+      smtp_port: port,
+      smtp_user: user,
+      smtp_pass: pass,
+      from_name: fromName
+    });
+    toast('Email configured');
+    closeModal('smtp-modal');
+    var p = __pendingBulkApply;
+    __pendingBulkApply = null;
+    if (p) doBulkApply(p.selectedIds, p.templateId, true, p.useAI);
+  } catch (e) {
+    errEl.textContent = 'Failed to save: ' + (e.message || 'unknown error');
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save & Continue';
+  }
+}
+
+function skipSmtpAndContinue() {
+  closeModal('smtp-modal');
+  var p = __pendingBulkApply;
+  __pendingBulkApply = null;
+  if (p) doBulkApply(p.selectedIds, p.templateId, false, p.useAI);
+}
+
+function doBulkApply(selectedIds, templateId, sendEmail, useAI) {
   showConfirm(
     'Confirm Bulk Apply',
     'Apply to ' + selectedIds.length + ' jobs' + (useAI ? ' with AI personalization' : '') + (sendEmail ? ' and send emails where possible' : '') + '? This will mark them as APPLIED.',
