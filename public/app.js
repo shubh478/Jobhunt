@@ -1805,19 +1805,23 @@ async function generateBookmarklet() {
     };
     // Self-contained autofill function — runs in any page's context
     var fn = function(D) {
-      var fillMap = {
-        name:        ['name','fullname','full_name','full-name','candidatename','applicantname'],
-        first:       ['firstname','first_name','first-name','given-name','givenname','fname'],
-        last:        ['lastname','last_name','last-name','family-name','familyname','lname','surname'],
-        email:       ['email','emailaddress','email_address','email-address','e-mail'],
-        phone:       ['phone','telephone','phonenumber','phone_number','phone-number','mobile','tel'],
-        linkedin:    ['linkedin','linkedinurl','linkedin_url','linkedin-url','linkedinprofile'],
-        github:      ['github','githuburl','github_url','github-url','githubprofile'],
-        portfolio:   ['portfolio','website','personalwebsite','personal_website','personal-website','url'],
-        role:        ['currenttitle','currentrole','currentposition','jobtitle','job_title','job-title','title'],
-        years:       ['yearsofexperience','yearsexperience','years_of_experience','years-of-experience','experienceyears','totalexperience'],
-        location:    ['location','city','currentcity','currentlocation']
-      };
+      // Order matters — most specific keys first so they win the substring race.
+      // Each entry: [field, [keys]]. Keys are matched as substrings against a
+      // normalized token derived from name/id/placeholder/aria-label/label/autocomplete.
+      var rules = [
+        ['first',     ['firstname','first_name','first-name','givenname','given-name','given_name','fname']],
+        ['last',      ['lastname','last_name','last-name','familyname','family-name','family_name','lname','surname']],
+        ['email',     ['email','e-mail','emailaddress']],
+        ['phone',     ['phonenumber','phone_number','phone-number','mobilenumber','telephone','phone','mobile','tel']],
+        ['linkedin',  ['linkedinurl','linkedin_url','linkedin-url','linkedinprofile','linkedin']],
+        ['github',    ['githuburl','github_url','github-url','githubprofile','github']],
+        ['portfolio', ['portfoliourl','personalwebsite','personal_website','personal-website','portfolio','website']],
+        ['role',      ['currenttitle','currentrole','currentposition','jobtitle','job_title','job-title','currentjobtitle']],
+        ['years',     ['yearsofexperience','years_of_experience','years-of-experience','yearsexperience','experienceyears','totalexperience','yoe']],
+        ['location',  ['currentlocation','currentcity','citytown','city','location']],
+        // Full-name LAST so it doesn't gobble firstName/lastName via substring match
+        ['name',      ['fullname','full_name','full-name','candidatename','applicantname','yourname','legalname']]
+      ];
       var SKIP_TYPES = { file: 1, submit: 1, button: 1, reset: 1, checkbox: 1, radio: 1, hidden: 1, image: 1, color: 1, range: 1 };
       var filled = 0;
       var inputs = D.querySelectorAll('input,textarea');
@@ -1840,9 +1844,13 @@ async function generateBookmarklet() {
       inputs.forEach(function(el) {
         try {
           var keys = ((el.name || '') + ' ' + (el.id || '') + ' ' + (el.placeholder || '') + ' ' + (el.getAttribute('aria-label') || '') + ' ' + (el.getAttribute('autocomplete') || '') + ' ' + (el.labels && el.labels[0] ? el.labels[0].textContent : '')).toLowerCase().replace(/[^a-z0-9]/g, '');
-          for (var fld in fillMap) {
+          for (var i = 0; i < rules.length; i++) {
+            var fld = rules[i][0], list = rules[i][1];
             if (!data[fld]) continue;
-            var matched = fillMap[fld].some(function(k) { return keys.indexOf(k) >= 0; });
+            var matched = false;
+            for (var j = 0; j < list.length; j++) {
+              if (keys.indexOf(list[j]) >= 0) { matched = true; break; }
+            }
             if (matched && setVal(el, data[fld])) { filled++; break; }
           }
         } catch (e) {}
