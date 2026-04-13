@@ -1538,6 +1538,89 @@ async function bulkApply() {
 }
 
 // ============================== INIT ==============================
+// ============================== IMPORTERS ==============================
+function applyExtractedToProfile(ex) {
+  if (!ex) return;
+  var setIf = function(id, v) { if (v) { var el = document.getElementById(id); if (el && !el.value) el.value = v; } };
+  setIf('s-full-name', ex.full_name);
+  setIf('s-email', ex.email);
+  setIf('s-phone', ex.phone);
+  setIf('s-linkedin-url', ex.linkedin_url);
+  setIf('s-github-url', ex.github_url);
+  setIf('s-current-role', ex.current_role);
+  setIf('s-experience-years', ex.years);
+  setIf('s-summary', ex.summary);
+  // Skills: merge instead of replace
+  var skillsEl = document.getElementById('s-skills');
+  if (skillsEl && ex.skills) {
+    var current = (skillsEl.value || '').toLowerCase();
+    var newOnes = ex.skills.split(',').map(function(s){return s.trim();}).filter(function(s){return s && current.indexOf(s.toLowerCase()) < 0;});
+    skillsEl.value = (skillsEl.value ? skillsEl.value + ', ' : '') + newOnes.join(', ');
+  }
+}
+
+async function importResume() {
+  var file = document.getElementById('import-resume-file').files[0];
+  if (!file) return toast('Pick a PDF file first', true);
+  var btn = document.getElementById('import-resume-btn');
+  btn.disabled = true; btn.textContent = 'Parsing...';
+  try {
+    var fd = new FormData();
+    fd.append('resume', file);
+    var r = await fetch('/api/import/resume', { method: 'POST', body: fd, credentials: 'same-origin' });
+    if (r.status === 401) { window.location.href = '/login.html'; return; }
+    var data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Import failed');
+    applyExtractedToProfile(data.extracted);
+    document.getElementById('import-result').textContent = '✓ Resume parsed — ' + (data.extracted.skills || '').split(',').length + ' skills extracted. Review the profile below and click Save.';
+    toast('Resume imported');
+  } catch (e) {
+    toast(e.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Parse & Import';
+  }
+}
+
+async function importGithub() {
+  var username = document.getElementById('import-github-user').value.trim();
+  if (!username) return toast('Enter a GitHub username', true);
+  var btn = document.getElementById('import-github-btn');
+  btn.disabled = true; btn.textContent = 'Fetching...';
+  try {
+    var data = await api('/api/import/github', 'POST', { username: username });
+    applyExtractedToProfile(data.extracted);
+    var stats = data.extracted.stats || {};
+    document.getElementById('import-result').textContent = '✓ GitHub: ' + (stats.public_repos || 0) + ' repos, ' + (stats.followers || 0) + ' followers, ' + (stats.total_stars || 0) + ' stars. Review and save.';
+    toast('GitHub imported');
+  } catch (e) {
+    toast(e.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Fetch GitHub Profile';
+  }
+}
+
+async function importLinkedin() {
+  var file = document.getElementById('import-linkedin-file').files[0];
+  if (!file) return toast('Pick your LinkedIn export ZIP first', true);
+  var btn = document.getElementById('import-linkedin-btn');
+  btn.disabled = true; btn.textContent = 'Parsing...';
+  try {
+    var fd = new FormData();
+    fd.append('zip', file);
+    var r = await fetch('/api/import/linkedin', { method: 'POST', body: fd, credentials: 'same-origin' });
+    if (r.status === 401) { window.location.href = '/login.html'; return; }
+    var data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Import failed');
+    applyExtractedToProfile(data.extracted);
+    document.getElementById('import-result').textContent = '✓ LinkedIn parsed. Review the profile below and click Save.';
+    toast('LinkedIn imported');
+  } catch (e) {
+    toast(e.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Parse & Import';
+  }
+}
+
 async function showCurrentUser() {
   try {
     var me = await api('/api/auth/me');

@@ -549,6 +549,33 @@
       <span id="ghost-result" style="font-size:13px;color:#94a3b8;margin-left:10px"></span>
     </div>
 
+    <!-- One-click profile importers -->
+    <div class="settings-section">
+      <h3>Auto-Fill Profile</h3>
+      <p style="font-size:12px;color:#64748b;margin-bottom:12px">Import your resume, GitHub, or LinkedIn data to auto-populate profile fields below.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px">
+        <div style="background:rgba(15,15,17,.4);border:1px solid rgba(63,63,70,.4);border-radius:12px;padding:14px">
+          <div style="font-size:12px;font-weight:700;color:#a5b4fc;margin-bottom:6px">📄 Resume PDF</div>
+          <input type="file" id="import-resume-file" accept="application/pdf" style="font-size:11px;color:#a1a1aa;width:100%;margin-bottom:8px">
+          <button class="btn btn-sm btn-primary" onclick="importResume()" id="import-resume-btn" style="width:100%">Parse & Import</button>
+        </div>
+        <div style="background:rgba(15,15,17,.4);border:1px solid rgba(63,63,70,.4);border-radius:12px;padding:14px">
+          <div style="font-size:12px;font-weight:700;color:#a5b4fc;margin-bottom:6px">🐙 GitHub username</div>
+          <input type="text" id="import-github-user" placeholder="e.g. shubh478" style="width:100%;padding:7px 10px;background:#0f0f11;border:1px solid #3f3f46;border-radius:6px;color:#fafafa;font-size:12px;margin-bottom:8px">
+          <button class="btn btn-sm btn-primary" onclick="importGithub()" id="import-github-btn" style="width:100%">Fetch GitHub Profile</button>
+        </div>
+        <div style="background:rgba(15,15,17,.4);border:1px solid rgba(63,63,70,.4);border-radius:12px;padding:14px">
+          <div style="font-size:12px;font-weight:700;color:#a5b4fc;margin-bottom:6px">💼 LinkedIn ZIP export</div>
+          <input type="file" id="import-linkedin-file" accept=".zip" style="font-size:11px;color:#a1a1aa;width:100%;margin-bottom:8px">
+          <button class="btn btn-sm btn-primary" onclick="importLinkedin()" id="import-linkedin-btn" style="width:100%">Parse & Import</button>
+        </div>
+      </div>
+      <div id="import-result" style="font-size:12px;color:#86efac;margin-top:10px"></div>
+      <div style="font-size:11px;color:#52525b;margin-top:8px">
+        LinkedIn export → <a href="https://www.linkedin.com/mypreferences/d/download-my-data" target="_blank">linkedin.com/mypreferences/d/download-my-data</a> (request "Want something in particular" → Profile + Skills + Positions)
+      </div>
+    </div>
+
     <div class="settings-section">
       <h3>Your Profile</h3>
       <p style="font-size:12px;color:#64748b;margin-bottom:12px">This info is used to auto-fill cover letters.</p>

@@ -22,6 +22,7 @@ app.use('/api', (req, res, next) => {
 
 app.use('/api', require('./routes/applications'));
 app.use('/api', require('./routes/profile'));
+app.use('/api', require('./routes/import'));
 app.use('/api', require('./routes/templates'));
 app.use('/api', require('./routes/automation'));
 app.use('/api', require('./routes/stats'));
