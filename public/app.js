@@ -424,18 +424,78 @@ document.getElementById('search-keywords').addEventListener('input', updatePorta
 document.getElementById('search-location').addEventListener('input', updatePortalLinks);
 document.getElementById('search-keywords').addEventListener('keydown', function(e) { if (e.key === 'Enter') searchJobs(); });
 
-function scoreJob(job, kwTokens, locToken) {
+var __profileCache = null;
+async function getProfileForScoring() {
+  if (__profileCache) return __profileCache;
+  try {
+    var p = await api('/api/profile');
+    __profileCache = {
+      skills: (p.skills || '').toLowerCase().split(/[,;|\n]/).map(function(s){return s.trim();}).filter(function(s){return s.length>1;}),
+      years: parseInt(p.experience_years) || 0,
+      currentRole: (p.current_role || '').toLowerCase(),
+      summary: (p.summary || '').toLowerCase()
+    };
+  } catch (e) {
+    __profileCache = { skills: [], years: 0, currentRole: '', summary: '' };
+  }
+  return __profileCache;
+}
+
+function scoreJob(job, kwTokens, locToken, profile) {
   var title = (job.title || '').toLowerCase();
   var desc = (job.description || '').toLowerCase();
   var jobLoc = (job.location || '').toLowerCase();
+  var hay = title + ' ' + desc;
   var score = 0;
+  var reasons = [];
+
   kwTokens.forEach(function(t) {
     if (!t) return;
     if (title.includes(t)) score += 10;
     if (desc.includes(t)) score += 2;
   });
-  if (locToken && jobLoc.includes(locToken)) score += 5;
+  if (locToken && jobLoc.includes(locToken)) { score += 5; reasons.push('loc'); }
   if (/remote/.test(jobLoc)) score += 1;
+
+  if (profile) {
+    var skillHits = 0;
+    profile.skills.forEach(function(s) {
+      if (s && hay.includes(s)) {
+        score += title.includes(s) ? 8 : 4;
+        skillHits++;
+      }
+    });
+    if (skillHits) reasons.push(skillHits + ' skill' + (skillHits > 1 ? 's' : ''));
+
+    if (profile.currentRole && title.includes(profile.currentRole)) {
+      score += 6;
+      reasons.push('role');
+    }
+
+    // Experience-level match — penalize jobs that are way out of range
+    if (profile.years > 0) {
+      var rangeMatch = hay.match(/(\d{1,2})\s*\+?\s*(?:to|-)?\s*(\d{1,2})?\s*(?:years|yrs)/);
+      if (rangeMatch) {
+        var minY = parseInt(rangeMatch[1]);
+        var maxY = parseInt(rangeMatch[2]) || (minY + 5);
+        if (profile.years >= minY - 1 && profile.years <= maxY + 2) {
+          score += 5;
+          reasons.push('yrs✓');
+        } else if (profile.years < minY - 2) {
+          score -= 8; // way under-qualified
+        } else if (profile.years > maxY + 4) {
+          score -= 3; // overqualified
+        }
+      }
+
+      var seniorWords = ['senior', 'staff', 'principal', 'lead', 'architect'];
+      var juniorWords = ['junior', 'intern', 'entry', 'graduate', 'fresher'];
+      if (profile.years <= 2 && seniorWords.some(function(w){return title.includes(w);})) score -= 6;
+      if (profile.years >= 5 && juniorWords.some(function(w){return title.includes(w);})) score -= 4;
+    }
+  }
+
+  job._reasons = reasons;
   return score;
 }
 
@@ -457,10 +517,12 @@ async function searchJobs() {
 
   try {
     var t0 = Date.now();
+    var profilePromise = getProfileForScoring();
     var responses = await Promise.all(keywords.map(function(k) {
       return api('/api/auto/search-jobs?keywords=' + encodeURIComponent(k) + '&location=' + encodeURIComponent(loc) + '&limit=100')
         .catch(function(e) { return { jobs: [], errors: [k + ': ' + e.message], sources: {} }; });
     }));
+    var profile = await profilePromise;
 
     // Merge + dedup across keywords
     var seen = {};
@@ -472,7 +534,7 @@ async function searchJobs() {
         var key = ((j.company || '') + '|' + (j.title || '')).toLowerCase();
         if (seen[key]) return;
         seen[key] = 1;
-        j._score = scoreJob(j, kwTokens, locToken);
+        j._score = scoreJob(j, kwTokens, locToken, profile);
         allJobs.push(j);
       });
       (data.errors || []).forEach(function(e) { allErrors.push(e); });
@@ -511,11 +573,14 @@ async function searchJobs() {
       var urlEsc = esc(j.url);
       var locEsc = esc(j.location || 'Remote').replace(/'/g, "\\'");
       var salEsc = esc(j.salary || '').replace(/'/g, "\\'");
-      var scoreBadge = j._score >= 10
-        ? '<span class="badge badge-OFFER" title="Relevance score">★ ' + j._score + '</span> '
-        : j._score >= 5
-          ? '<span class="badge badge-INTERVIEW" title="Relevance score">' + j._score + '</span> '
-          : '';
+      var reasonsTxt = (j._reasons && j._reasons.length) ? ' (' + j._reasons.join(', ') + ')' : '';
+      var scoreBadge = j._score >= 20
+        ? '<span class="badge badge-OFFER" title="Relevance score' + reasonsTxt + '">★★ ' + j._score + reasonsTxt + '</span> '
+        : j._score >= 10
+          ? '<span class="badge badge-OFFER" title="Relevance score' + reasonsTxt + '">★ ' + j._score + reasonsTxt + '</span> '
+          : j._score >= 5
+            ? '<span class="badge badge-INTERVIEW" title="Relevance score' + reasonsTxt + '">' + j._score + reasonsTxt + '</span> '
+            : '';
       return '<div class="job-card">' +
         '<h3>' + scoreBadge + esc(j.title) + '</h3>' +
         '<div class="meta">' + esc(j.company) + ' &bull; ' + esc(j.location || 'Remote') + (j.salary ? ' &bull; ' + esc(j.salary) : '') + ' &bull; <span class="badge badge-APPLIED">' + esc(j.source) + '</span></div>' +
