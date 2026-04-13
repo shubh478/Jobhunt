@@ -1763,6 +1763,46 @@ function doBulkApply(selectedIds, templateId, sendEmail, useAI) {
 }
 
 // ============================== INIT ==============================
+// ============================== URL RESOLVER ==============================
+// Cache resolved URLs in localStorage so we don't re-resolve the same aggregator link.
+function getCachedResolvedUrl(originalUrl) {
+  try {
+    var cache = JSON.parse(localStorage.getItem('jhp_url_cache') || '{}');
+    var entry = cache[originalUrl];
+    if (entry && (Date.now() - entry.t) < 7 * 24 * 60 * 60 * 1000) return entry.u;
+  } catch {}
+  return null;
+}
+
+function setCachedResolvedUrl(originalUrl, finalUrl) {
+  try {
+    var cache = JSON.parse(localStorage.getItem('jhp_url_cache') || '{}');
+    cache[originalUrl] = { u: finalUrl, t: Date.now() };
+    // Keep cache from growing forever — evict oldest if > 500 entries
+    var keys = Object.keys(cache);
+    if (keys.length > 500) {
+      keys.sort(function(a,b){return cache[a].t - cache[b].t;}).slice(0, 100).forEach(function(k){delete cache[k];});
+    }
+    localStorage.setItem('jhp_url_cache', JSON.stringify(cache));
+  } catch {}
+}
+
+// Resolve an aggregator URL to the company's actual career page.
+// Returns the final URL (or original if resolution fails).
+async function resolveJobUrl(originalUrl) {
+  if (!originalUrl) return originalUrl;
+  var cached = getCachedResolvedUrl(originalUrl);
+  if (cached) return cached;
+  try {
+    var data = await api('/api/jobs/resolve-url', 'POST', { url: originalUrl });
+    var final = data.finalUrl || originalUrl;
+    setCachedResolvedUrl(originalUrl, final);
+    return final;
+  } catch {
+    return originalUrl;
+  }
+}
+
 // ============================== JOB PREVIEW MODAL ==============================
 // Cache the last search results so the preview modal can look up by company|title key
 var __lastSearchJobs = [];
@@ -1804,11 +1844,19 @@ function openJobPreview(company, role) {
   var descEl = document.getElementById('jp-description');
   descEl.textContent = job.description || '(No description available from this source — click "Open original" for full details on the company\'s site.)';
 
-  // External link (small, optional)
+  // External link — intercept click to resolve aggregator → company first
   var extLink = document.getElementById('jp-external-link');
   if (job.url) {
     extLink.href = job.url;
     extLink.style.display = '';
+    extLink.textContent = 'Open company page ↗';
+    extLink.onclick = async function(e) {
+      e.preventDefault();
+      extLink.textContent = 'Resolving...';
+      var finalUrl = await resolveJobUrl(job.url);
+      extLink.textContent = 'Open company page ↗';
+      window.open(finalUrl, '_blank', 'noopener');
+    };
   } else {
     extLink.style.display = 'none';
   }
@@ -1844,14 +1892,16 @@ function escAttr(s) { return String(s || '').replace(/"/g, '&quot;').replace(/'/
 async function openApplyHelper(company, role, url, jobDescription) {
   var helper = document.getElementById('apply-helper');
   document.getElementById('ah-title').textContent = role + ' @ ' + company;
-  document.getElementById('ah-meta').textContent = 'Loading your profile...';
+  document.getElementById('ah-meta').textContent = 'Resolving company link...';
   // eslint-disable-next-line no-unsanitized/property
-  document.getElementById('ah-body')['inner' + 'HTML'] = '<div style="padding:20px;text-align:center;color:#71717a;font-size:12px"><span class="spinner"></span> Preparing application kit...</div>';
+  document.getElementById('ah-body')['inner' + 'HTML'] = '<div style="padding:20px;text-align:center;color:#71717a;font-size:12px"><span class="spinner"></span> Following redirects to the company\'s real apply page...</div>';
   helper.classList.add('open');
 
-  // Open the job URL in a new tab so the user has both windows side by side
+  // Resolve aggregator URL → company career page, then open in new tab
+  var finalUrl = url;
   if (url) {
-    try { window.open(url, '_blank', 'noopener'); } catch {}
+    finalUrl = await resolveJobUrl(url);
+    try { window.open(finalUrl, '_blank', 'noopener'); } catch {}
   }
 
   try {
@@ -1883,7 +1933,9 @@ async function openApplyHelper(company, role, url, jobDescription) {
       '<div id="ah-cover-area"><button class="btn btn-sm btn-primary" style="width:100%" onclick="ahGenerateCover(\'' + escAttr(company) + '\',\'' + escAttr(role) + '\',\'' + escAttr(jobDescription || '') + '\')" id="ah-gen-cover-btn">🤖 Generate AI Cover Letter</button></div>' +
       '</div>';
 
-    document.getElementById('ah-meta').textContent = (url || '').slice(0, 60);
+    var resolvedHost = '';
+    try { resolvedHost = new URL(finalUrl).hostname.replace(/^www\./, ''); } catch {}
+    document.getElementById('ah-meta').textContent = resolvedHost ? '↗ ' + resolvedHost : (finalUrl || '').slice(0, 60);
     // eslint-disable-next-line no-unsanitized/property
     document.getElementById('ah-body')['inner' + 'HTML'] =
       '<div class="ah-section">' +
