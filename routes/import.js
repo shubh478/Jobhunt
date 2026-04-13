@@ -6,8 +6,10 @@ const pool = require('../db/pool');
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 // Lazy-load pdf-parse so a missing/broken install doesn't crash the whole server
+let __pdfParseLoadError = null;
 function loadPdfParse() {
-  try { return require('pdf-parse'); } catch (e) { return null; }
+  try { return require('pdf-parse'); }
+  catch (e) { __pdfParseLoadError = e.message; return null; }
 }
 
 // Extract structured fields from raw resume text
@@ -71,7 +73,9 @@ router.post('/import/resume', upload.single('resume'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
     const pdfParse = loadPdfParse();
-    if (!pdfParse) return res.status(500).json({ error: 'PDF parser not installed (pdf-parse missing)' });
+    if (!pdfParse) return res.status(500).json({
+      error: 'PDF parser failed to load. Cause: ' + (__pdfParseLoadError || 'unknown') + '. Run: npm install pdf-parse@1.1.1'
+    });
 
     let text = '';
     try {
