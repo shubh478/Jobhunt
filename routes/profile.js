@@ -17,7 +17,7 @@ router.get('/profile', async (req, res) => {
 router.put('/profile', async (req, res) => {
   try {
     const { full_name, email, phone, linkedin_url, github_url, portfolio_url, current_role, experience_years, skills, summary, resume_text } = req.body;
-    let query = `UPDATE profile SET full_name=$1, email=$2, phone=$3, linkedin_url=$4, github_url=$5, portfolio_url=$6, current_role=$7, experience_years=$8, skills=$9, summary=$10`;
+    let query = `UPDATE profile SET full_name=$1, email=$2, phone=$3, linkedin_url=$4, github_url=$5, portfolio_url=$6, "current_role"=$7, experience_years=$8, skills=$9, summary=$10`;
     let params = [full_name || '', email || '', phone || '', linkedin_url || '', github_url || '', portfolio_url || '', current_role || '', experience_years || '', skills || '', summary || ''];
     if (resume_text !== undefined) {
       query += `, resume_text=$11 WHERE id=1`;

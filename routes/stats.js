@@ -105,7 +105,7 @@ router.post('/import', async (req, res) => {
     if (data.profile) {
       const p = data.profile;
       await pool.query(
-        `UPDATE profile SET full_name=$1, email=$2, phone=$3, linkedin_url=$4, github_url=$5, portfolio_url=$6, current_role=$7, experience_years=$8, skills=$9, summary=$10 WHERE id=1`,
+        `UPDATE profile SET full_name=$1, email=$2, phone=$3, linkedin_url=$4, github_url=$5, portfolio_url=$6, "current_role"=$7, experience_years=$8, skills=$9, summary=$10 WHERE id=1`,
         [p.full_name || '', p.email || '', p.phone || '', p.linkedin_url || '', p.github_url || '', p.portfolio_url || '', p.current_role || '', p.experience_years || '', p.skills || '', p.summary || '']
       );
     }

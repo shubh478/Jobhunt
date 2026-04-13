@@ -55,7 +55,7 @@ async function initDB() {
       linkedin_url TEXT DEFAULT '',
       github_url TEXT DEFAULT '',
       portfolio_url TEXT DEFAULT '',
-      current_role TEXT DEFAULT '',
+      "current_role" TEXT DEFAULT '',
       experience_years TEXT DEFAULT '',
       skills TEXT DEFAULT '',
       summary TEXT DEFAULT '',
