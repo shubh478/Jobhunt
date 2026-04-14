@@ -14,7 +14,17 @@ function loadPdfParse() {
 
 // Extract structured fields from raw resume text
 function extractFromResume(text) {
-  const out = { email: '', phone: '', linkedin_url: '', github_url: '', skills: [], years: '', current_role: '', summary: '' };
+  const out = { full_name: '', email: '', phone: '', linkedin_url: '', github_url: '', skills: [], years: '', current_role: '', summary: '' };
+
+  // Name: first non-empty line within the first 5 lines that looks like a name
+  // (2-4 words, no @ no digits, reasonable length, no colons)
+  const topLines = text.split(/\n+/).map(l => l.trim()).filter(Boolean).slice(0, 6);
+  for (const l of topLines) {
+    if (l.length > 2 && l.length < 50 && !/[@:\d]/.test(l) && /^[A-Z]/.test(l) && l.split(/\s+/).length >= 2 && l.split(/\s+/).length <= 5) {
+      out.full_name = l;
+      break;
+    }
+  }
 
   const emailMatch = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
   if (emailMatch) out.email = emailMatch[0];
