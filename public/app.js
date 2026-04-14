@@ -101,6 +101,32 @@ function setLoading(elId, loading) {
   }
 }
 
+// Show an orange banner if the user hasn't filled in critical profile fields.
+// Critical = experience_years (drives smart filter) + full_name + skills.
+// A complete profile = better job matching + autofill works on real forms.
+async function checkProfileCompleteness() {
+  var banner = document.getElementById('profile-banner');
+  if (!banner) return;
+  var p;
+  try { p = await api('/api/profile'); } catch { return; }
+  var missing = [];
+  if (!p.full_name) missing.push('name');
+  if (!p.email) missing.push('email');
+  if (!p.experience_years) missing.push('years of experience');
+  if (!p.skills) missing.push('skills');
+  if (!p.resume_path && !p.resume_filename) missing.push('resume');
+  if (missing.length === 0) { banner['inner' + 'HTML'] = ''; return; }
+  // eslint-disable-next-line no-unsanitized/property
+  banner['inner' + 'HTML'] =
+    '<div style="background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(234,88,12,.12));border:1px solid rgba(245,158,11,.35);border-radius:12px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">' +
+      '<div style="flex:1;min-width:200px">' +
+        '<div style="font-size:14px;font-weight:700;color:#fbbf24;margin-bottom:4px">Complete your profile to get better matches</div>' +
+        '<div style="font-size:12px;color:#fcd34d">Missing: ' + esc(missing.join(', ')) + '. The Chrome autofill extension + smart filter need these.</div>' +
+      '</div>' +
+      '<button class="btn btn-primary" onclick="showTab(\'settings\')" style="background:#f59e0b">Fill Profile →</button>' +
+    '</div>';
+}
+
 // ============================== DASHBOARD ==============================
 async function loadDashboard() {
   var data;
@@ -113,6 +139,9 @@ async function loadDashboard() {
   var stats = data[0];
   allApps = data[1] || [];
   var logs = data[2] || [];
+
+  // Profile-incomplete nudge — shown above follow-up banner
+  checkProfileCompleteness();
 
   var banner = document.getElementById('followup-banner');
   if (stats.followUps && stats.followUps.length > 0) {
@@ -1326,6 +1355,8 @@ async function saveProfile() {
   if (resumeTextEl) body.resume_text = resumeTextEl.value.trim();
   await api('/api/profile', 'PUT', body);
   __profileCache = null; // bust cache so search re-reads new years/skills next time
+  try { updateExpFilterHint(); } catch {}
+  try { checkProfileCompleteness(); } catch {}
   toast('Profile saved');
 }
 
@@ -1729,6 +1760,24 @@ async function scoreQueuedJobs() {
 
 // Pending bulk apply request — set when SMTP modal is opened so we can resume after save
 var __pendingBulkApply = null;
+
+// Delete every WISHLIST job whose portal_url is an aggregator (apna, adzuna, etc.).
+// These are dead weight — the Auto Apply flow can't autofill them anyway.
+async function cleanupAggregatorWishlist() {
+  showConfirm(
+    'Remove aggregator wishlist jobs?',
+    'Deletes every WISHLIST job whose link points at an aggregator (apna.co, adzuna, shine, simplyhired, foundit, etc.). These jobs can\'t be auto-filled because the Chrome extension only works on Greenhouse/Lever/Ashby. You can always re-fetch with better filters.',
+    async function() {
+      try {
+        var r = await api('/api/applications/cleanup-aggregators', 'POST', {});
+        toast('Removed ' + r.deleted + ' aggregator jobs');
+        try { loadAutomation(); } catch {}
+        try { loadDashboard(); } catch {}
+        try { loadApplications(); } catch {}
+      } catch (e) { toast('Cleanup failed: ' + e.message, true); }
+    }
+  );
+}
 
 async function resetAppliedToWishlist() {
   showConfirm(

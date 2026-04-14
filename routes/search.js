@@ -119,47 +119,9 @@ router.get('/auto/search-jobs', async (req, res) => {
     );
   }
 
-  // Source 4: RemoteOK (free, no API key)
-  fetches.push(
-    fetch('https://remoteok.com/api', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-        'Accept': 'application/json,text/plain,*/*',
-        'Accept-Language': 'en-US,en;q=0.9'
-      }
-    })
-      .then(async r => {
-        const text = await r.text();
-        try { return JSON.parse(text); }
-        catch { throw new Error('RemoteOK returned non-JSON (status ' + r.status + ')'); }
-      })
-      .then(data => {
-        // First element is metadata, skip it
-        const jobs = Array.isArray(data) ? data.slice(1) : [];
-        const kwLower = keywords.toLowerCase();
-        jobs
-          .filter(j => j.position && (
-            j.position.toLowerCase().includes(kwLower) ||
-            (j.tags || []).some(t => t.toLowerCase().includes(kwLower)) ||
-            (j.description || '').toLowerCase().includes(kwLower)
-          ))
-          .slice(0, 30)
-          .forEach(j => {
-            results.push({
-              title: j.position,
-              company: j.company || 'Unknown',
-              location: j.location || 'Remote',
-              salary: j.salary || '',
-              url: j.url || `https://remoteok.com/l/${j.id}`,
-              source: 'RemoteOK',
-              tags: (j.tags || []).slice(0, 5),
-              posted: j.date || '',
-              description: (j.description || '').replace(/<[^>]*>/g, '').substring(0, 1500)
-            });
-          });
-      })
-      .catch(e => errors.push('RemoteOK: ' + e.message))
-  );
+  // Source 4: RemoteOK removed — their public API started returning 403 to
+  // cloud provider IPs (Render included) in early 2026. Kept the slot so
+  // the sources array numbering doesn't drift in git history.
 
   // Source 5: Jobicy (free, no API key)
   fetches.push(
@@ -297,7 +259,6 @@ router.get('/auto/search-jobs', async (req, res) => {
       remotive: true,
       adzuna: !!process.env.ADZUNA_APP_ID,
       jsearch: !!process.env.RAPIDAPI_KEY,
-      remoteok: true,
       jobicy: true,
       greenhouse: true,
       lever: true,

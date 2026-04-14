@@ -273,6 +273,7 @@
 
   <!-- ==================== DASHBOARD ==================== -->
   <div id="tab-dashboard" class="tab active">
+    <div id="profile-banner"></div>
     <div id="followup-banner"></div>
     <div class="stats-grid" id="stats-grid"></div>
 
@@ -414,6 +415,7 @@
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <button class="btn btn-primary" onclick="bulkApply()" id="bulk-apply-btn">Mark Selected as APPLIED</button>
+        <button class="btn btn-danger" onclick="cleanupAggregatorWishlist()" title="Delete every WISHLIST job whose link is an aggregator (apna, adzuna, shine, etc.). These can't be autofilled.">🧹 Clean Aggregators</button>
         <button class="btn btn-warn" onclick="resetAppliedToWishlist()" style="margin-left:auto">↺ Reset all APPLIED → WISHLIST</button>
         <span id="auto-apply-status" style="font-size:13px;color:#94a3b8"></span>
       </div>

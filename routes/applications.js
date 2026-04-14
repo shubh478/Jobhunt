@@ -75,6 +75,29 @@ router.post('/applications/reset-applied-to-wishlist', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Delete WISHLIST rows whose portal_url points at an aggregator site
+// (apna, shine, adzuna, simplyhired, etc.) — used to clean out stale
+// aggregator-sourced saved jobs that can never be autofilled.
+router.post('/applications/cleanup-aggregators', async (req, res) => {
+  try {
+    const hosts = [
+      'apna.co','shine.com','adzuna.','jobicy.com','jobrapido.','simplyhired.',
+      'foundit.','timesjobs.com','iimjobs.com','hirist.','cutshort.io',
+      'instahyre.com','wellfound.com','monster.','ziprecruiter.com',
+      'jooble.org','flexjobs.com','jobs.google.com'
+    ];
+    const likeClause = hosts.map((_, i) => `portal_url ILIKE $${i + 2}`).join(' OR ');
+    const params = [req.userId, ...hosts.map(h => `%${h}%`)];
+    const result = await pool.query(
+      `DELETE FROM applications
+       WHERE user_id=$1 AND status='WISHLIST' AND (${likeClause})
+       RETURNING id, company, role`,
+      params
+    );
+    res.json({ ok: true, deleted: result.rows.length, sample: result.rows.slice(0, 5) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 router.post('/auto-ghost', async (req, res) => {
   try {
     const result = await pool.query(
