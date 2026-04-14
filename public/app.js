@@ -1663,8 +1663,8 @@ async function loadAutoQueue() {
       '<div style="font-size:11px;color:#64748b">' + esc(j.location) + (j.salary_range ? ' | ' + esc(j.salary_range) : '') + ' | ' + esc(j.platform) + '</div></div>' +
       scoreBadge +
       (j.portal_url ? '<a class="btn btn-sm btn-ghost" href="' + esc(j.portal_url) + '" target="_blank">View</a>' : '') +
-      (j.portal_url ? '<button class="btn btn-sm btn-primary" title="Open portal in new tab and auto-fill the form" onclick="applyWithAutofill(\'' + esc(j.portal_url).replace(/'/g, "\\'") + '\')">⚡ Auto Apply</button>' : '') +
-      '<button class="btn btn-sm btn-ghost" title="Search Google for this role on Greenhouse/Lever/Ashby directly" onclick="findDirectATS(\'' + esc(j.company).replace(/'/g, "\\'") + '\',\'' + esc(j.role).replace(/'/g, "\\'") + '\')">🔍 Direct ATS</button>' +
+      (j.portal_url ? '<button class="btn btn-sm btn-primary" title="Resolves aggregator → direct ATS. If the link is pure aggregator (adzuna/apna), falls back to a Google search scoped to Greenhouse/Lever/Ashby." onclick="applyWithAutofill(\'' + esc(j.portal_url).replace(/'/g, "\\'") + '\',\'' + esc(j.company).replace(/'/g, "\\'") + '\',\'' + esc(j.role).replace(/'/g, "\\'") + '\')">⚡ Auto Apply</button>' : '') +
+      '<button class="btn btn-sm btn-ghost" title="Force a Google search for this role on Greenhouse/Lever/Ashby directly" onclick="findDirectATS(\'' + esc(j.company).replace(/'/g, "\\'") + '\',\'' + esc(j.role).replace(/'/g, "\\'") + '\')">🔍 Direct ATS</button>' +
       '<button class="btn btn-sm btn-danger" onclick="removeFromQueue(' + j.id + ')">Remove</button>' +
       '</div>';
   }).join('');
@@ -1686,13 +1686,22 @@ function findDirectATS(company, role) {
 }
 
 // Resolve aggregator URL → direct company portal, then open with the ?jhp=autofill hint
-// if it lands on a supported ATS. Otherwise open raw so user can apply manually.
-async function openForAutofill(originalUrl) {
+// if it lands on a supported ATS. If it's still an aggregator after redirect-following
+// AND we know the company+role, fall back to a Google search scoped to GH/Lever/Ashby —
+// one click, one new tab, lands on a page the extension can autofill.
+async function openForAutofill(originalUrl, company, role) {
   var finalUrl = await resolveJobUrl(originalUrl);
   if (isSupportedATS(finalUrl)) {
     var sep = finalUrl.indexOf('?') >= 0 ? '&' : '?';
     window.open(finalUrl + sep + 'jhp=autofill', '_blank', 'noopener');
     return { opened: true, autofill: true };
+  }
+  // Pure-aggregator fallback: escape via Google site-scoped search.
+  // Only triggers when we have both company and role — otherwise the search is useless.
+  if (company && role) {
+    var q = '"' + company + '" "' + role + '" (site:greenhouse.io OR site:lever.co OR site:ashbyhq.com OR site:workdayjobs.com OR site:smartrecruiters.com)';
+    window.open('https://www.google.com/search?q=' + encodeURIComponent(q), '_blank', 'noopener');
+    return { opened: true, autofill: false, fallback: 'google' };
   }
   window.open(finalUrl, '_blank', 'noopener');
   return { opened: true, autofill: false, finalUrl: finalUrl };
@@ -1700,34 +1709,52 @@ async function openForAutofill(originalUrl) {
 
 // Opens the portal URL with the ?jhp=autofill hint so the extension auto-fills on load.
 // Requires the Job Hunt Pro Chrome extension to be installed.
-async function applyWithAutofill(url) {
+async function applyWithAutofill(url, company, role) {
   if (!url) { toast('No portal URL on this job', true); return; }
   toast('Resolving company portal…');
-  var result = await openForAutofill(url);
-  if (!result.autofill) {
+  var result = await openForAutofill(url, company, role);
+  if (result.autofill) {
+    toast('Opened on ATS — extension will auto-fill');
+  } else if (result.fallback === 'google') {
+    toast('Aggregator link — opened Google search for direct ATS', true);
+  } else {
     toast('Not on Greenhouse/Lever/Ashby — opened for manual apply', true);
   }
 }
 
 // Bulk flow — opens selected wishlist jobs in sequence (1s apart so Chrome doesn't block popups).
 // You Submit each one manually; extension auto-marks APPLIED after submit.
+// Reads company/role from the queue row so the Google-fallback path works for aggregators.
 async function applySelectedWithAutofill() {
-  var urls = [];
+  var picks = [];
   document.querySelectorAll('.queue-checkbox:checked').forEach(function(c) {
     var row = c.closest('div');
-    var link = row && row.querySelector('a.btn-ghost');
-    if (link) urls.push(link.href);
+    if (!row) return;
+    var link = row.querySelector('a.btn-ghost');
+    if (!link) return;
+    var strong = row.querySelector('strong');
+    var company = strong ? strong.textContent.trim() : '';
+    // Role is the text after " — " in the same flex cell
+    var textCell = strong ? strong.parentElement : null;
+    var role = '';
+    if (textCell) {
+      var txt = textCell.childNodes[2] ? textCell.childNodes[2].textContent : '';
+      role = (txt || '').replace(/^\s*—\s*/, '').trim();
+    }
+    picks.push({ url: link.href, company: company, role: role });
   });
-  if (urls.length === 0) { toast('Select jobs first', true); return; }
-  if (urls.length > 10 && !confirm('Open ' + urls.length + ' tabs? Chrome may block popups beyond ~10.')) return;
-  toast('Resolving ' + urls.length + ' portals…');
-  var autofilled = 0, manual = 0;
-  for (var i = 0; i < urls.length; i++) {
-    var result = await openForAutofill(urls[i]);
-    if (result.autofill) autofilled++; else manual++;
+  if (picks.length === 0) { toast('Select jobs first', true); return; }
+  if (picks.length > 10 && !confirm('Open ' + picks.length + ' tabs? Chrome may block popups beyond ~10.')) return;
+  toast('Resolving ' + picks.length + ' portals…');
+  var autofilled = 0, googled = 0, manual = 0;
+  for (var i = 0; i < picks.length; i++) {
+    var result = await openForAutofill(picks[i].url, picks[i].company, picks[i].role);
+    if (result.autofill) autofilled++;
+    else if (result.fallback === 'google') googled++;
+    else manual++;
     await new Promise(function(r) { setTimeout(r, 1000); });
   }
-  toast('Opened ' + autofilled + ' auto-fill • ' + manual + ' manual (not on GH/Lever/Ashby)');
+  toast('Opened: ' + autofilled + ' auto-fill, ' + googled + ' Google-fallback, ' + manual + ' manual');
 }
 
 function selectAllQueue() {
