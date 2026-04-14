@@ -521,6 +521,46 @@ async function getProfileForScoring() {
   return __profileCache;
 }
 
+// Explicit seniority filter — title + JD year requirement, independent of profile.
+// levelMode: 'entry' | 'mid' | 'entry-mid' | 'senior'
+function matchesLevel(job, levelMode) {
+  var title = (job.title || '').toLowerCase();
+  var desc = (job.description || '').toLowerCase();
+  var hay = title + ' ' + desc;
+
+  var seniorRx = /\b(senior|sr\.?|staff|principal|lead\b|architect|head\s+of|director|vp\b|chief|manager)\b/;
+  var juniorRx = /\b(junior|jr\.?|intern|trainee|fresher|entry[-\s]*level|graduate|apprentice)\b/;
+
+  var isSeniorTitle = seniorRx.test(title);
+  var isJuniorTitle = juniorRx.test(title);
+
+  var req = parseJobYearRequirement(hay);
+  var minYrs = req ? req.min : null;
+
+  if (levelMode === 'entry') {
+    if (isSeniorTitle) return { keep: false, reason: 'senior title' };
+    if (minYrs !== null && minYrs > 2) return { keep: false, reason: 'needs ' + minYrs + '+ yrs' };
+    return { keep: true };
+  }
+  if (levelMode === 'mid') {
+    if (isSeniorTitle) return { keep: false, reason: 'senior title' };
+    if (isJuniorTitle) return { keep: false, reason: 'junior title' };
+    if (minYrs !== null && minYrs > 5) return { keep: false, reason: 'needs ' + minYrs + '+ yrs' };
+    return { keep: true };
+  }
+  if (levelMode === 'entry-mid') {
+    if (isSeniorTitle) return { keep: false, reason: 'senior title' };
+    if (minYrs !== null && minYrs > 5) return { keep: false, reason: 'needs ' + minYrs + '+ yrs' };
+    return { keep: true };
+  }
+  if (levelMode === 'senior') {
+    if (isJuniorTitle) return { keep: false, reason: 'junior title' };
+    // Accept anything else; senior-ish titles score well naturally
+    return { keep: true };
+  }
+  return { keep: true };
+}
+
 // Given a job and the user's years, decide if it's a fit.
 // Returns: { keep: boolean, reason: string }
 // Tolerance: user with X years matches jobs requiring [X-1, X+2] years.
@@ -638,6 +678,8 @@ async function searchJobs() {
     // Read experience filter controls
     var expFilterEl = document.getElementById('exp-filter-mode');
     var expMode = expFilterEl ? expFilterEl.value : 'smart'; // 'off' | 'smart' | 'strict'
+    var levelEl = document.getElementById('level-filter');
+    var levelMode = levelEl ? levelEl.value : 'entry-mid'; // 'any'|'entry'|'mid'|'entry-mid'|'senior'
 
     // Merge + dedup + filter across keywords
     var seen = {};
@@ -652,7 +694,17 @@ async function searchJobs() {
         if (seen[key]) return;
         seen[key] = 1;
 
-        // Experience filter (skip if mode = off or no profile years)
+        // Explicit seniority level filter — runs regardless of profile years
+        if (levelMode !== 'any') {
+          var levelFit = matchesLevel(j, levelMode);
+          if (!levelFit.keep) {
+            filteredOut++;
+            filterReasons[levelFit.reason] = (filterReasons[levelFit.reason] || 0) + 1;
+            return;
+          }
+        }
+
+        // Profile-year-based experience filter (smart/strict/off)
         if (expMode !== 'off' && profile && profile.years > 0) {
           var fit = fitsExperience(j, profile.years, expMode === 'strict');
           if (!fit.keep) {
@@ -1581,6 +1633,7 @@ async function loadAutoQueue() {
       scoreBadge +
       (j.portal_url ? '<a class="btn btn-sm btn-ghost" href="' + esc(j.portal_url) + '" target="_blank">View</a>' : '') +
       (j.portal_url ? '<button class="btn btn-sm btn-primary" title="Open portal in new tab and auto-fill the form" onclick="applyWithAutofill(\'' + esc(j.portal_url).replace(/'/g, "\\'") + '\')">⚡ Auto Apply</button>' : '') +
+      '<button class="btn btn-sm btn-ghost" title="Search Google for this role on Greenhouse/Lever/Ashby directly" onclick="findDirectATS(\'' + esc(j.company).replace(/'/g, "\\'") + '\',\'' + esc(j.role).replace(/'/g, "\\'") + '\')">🔍 Direct ATS</button>' +
       '<button class="btn btn-sm btn-danger" onclick="removeFromQueue(' + j.id + ')">Remove</button>' +
       '</div>';
   }).join('');
@@ -1590,6 +1643,15 @@ async function loadAutoQueue() {
 var SUPPORTED_ATS_HOSTS = /(^|\.)(greenhouse\.io|lever\.co|ashbyhq\.com)$/i;
 function isSupportedATS(url) {
   try { return SUPPORTED_ATS_HOSTS.test(new URL(url).hostname); } catch { return false; }
+}
+
+// Open a Google search scoped to direct ATS hosts so the user can click through
+// to the real Greenhouse/Lever/Ashby posting even when the stored URL is an
+// aggregator like apna.co/adzuna. The extension fires once they land on the ATS.
+function findDirectATS(company, role) {
+  if (!company && !role) { toast('No company or role on this job', true); return; }
+  var q = '"' + (company || '') + '" "' + (role || '') + '" (site:greenhouse.io OR site:lever.co OR site:ashbyhq.com OR site:workdayjobs.com)';
+  window.open('https://www.google.com/search?q=' + encodeURIComponent(q), '_blank', 'noopener');
 }
 
 // Resolve aggregator URL → direct company portal, then open with the ?jhp=autofill hint

@@ -15,7 +15,23 @@ const AGGREGATOR_HOSTS = [
   'linkedin.com/comm', // tracking redirects
   'click.appcast', 'click.indeed',
   'jobs.google.com',
-  'simplyhired.com', 'monster.com'
+  'simplyhired.com', 'simplyhired.co.in',
+  'monster.com', 'monsterindia.com',
+  'apna.co',
+  'shine.com',
+  'jobrapido.com', 'in.jobrapido.com',
+  'foundit.in', 'foundit.sg',
+  'timesjobs.com',
+  'iimjobs.com',
+  'hirist.com', 'hirist.tech',
+  'cutshort.io',
+  'instahyre.com',
+  'wellfound.com',
+  'angel.co',
+  'ziprecruiter.com',
+  'careerbuilder.com',
+  'jooble.org',
+  'flexjobs.com'
 ];
 
 // Hosts that ARE the company's ATS — these are the "good" final destinations.

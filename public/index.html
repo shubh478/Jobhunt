@@ -432,7 +432,14 @@
     <div class="search-bar">
       <input id="search-keywords" placeholder="Keywords — comma-separate for multi-query (e.g. SDE, Backend Developer, Python)">
       <input id="search-location" placeholder="Location (e.g. Bangalore, Remote)" style="max-width:220px">
-      <select id="exp-filter-mode" title="Filter by experience match" style="max-width:180px;padding:9px 10px;background:#0f0f11;border:1px solid #3f3f46;border-radius:8px;color:#fafafa;font-size:13px;font-family:inherit">
+      <select id="level-filter" title="Seniority level" style="max-width:170px;padding:9px 10px;background:#0f0f11;border:1px solid #3f3f46;border-radius:8px;color:#fafafa;font-size:13px;font-family:inherit">
+        <option value="entry-mid" selected>Entry + Mid (0–5 yrs)</option>
+        <option value="entry">Entry only (0–2 yrs)</option>
+        <option value="mid">Mid only (2–5 yrs)</option>
+        <option value="senior">Senior (5+ yrs)</option>
+        <option value="any">All levels</option>
+      </select>
+      <select id="exp-filter-mode" title="Profile-based experience match (layered on top of level filter)" style="max-width:180px;padding:9px 10px;background:#0f0f11;border:1px solid #3f3f46;border-radius:8px;color:#fafafa;font-size:13px;font-family:inherit">
         <option value="smart" selected>Smart match (recommended)</option>
         <option value="strict">Strict — exact range only</option>
         <option value="off">No experience filter</option>
