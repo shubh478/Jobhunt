@@ -84,7 +84,10 @@ router.post('/applications/cleanup-aggregators', async (req, res) => {
       'apna.co','shine.com','adzuna.','jobicy.com','jobrapido.','simplyhired.',
       'foundit.','timesjobs.com','iimjobs.com','hirist.','cutshort.io',
       'instahyre.com','wellfound.com','monster.','ziprecruiter.com',
-      'jooble.org','flexjobs.com','jobs.google.com'
+      'jooble.org','flexjobs.com','jobs.google.com',
+      'indeed.com','glassdoor.com','glassdoor.co.in','glassdoor.',
+      'bebee.com','naukri.com','remoteok.','remotive.',
+      'example.com' // test URLs
     ];
     const likeClause = hosts.map((_, i) => `portal_url ILIKE $${i + 2}`).join(' OR ');
     const params = [req.userId, ...hosts.map(h => `%${h}%`)];
