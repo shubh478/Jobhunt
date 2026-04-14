@@ -1,4 +1,4 @@
-const API = 'http://localhost:3456/api';
+const API = 'https://jobhunt-g4dj.onrender.com/api';
 const statusEl = document.getElementById('status');
 
 const say = (msg, cls = '') => { statusEl.className = 'status ' + cls; statusEl.textContent = msg; };
@@ -12,7 +12,7 @@ document.getElementById('fill').addEventListener('click', async () => {
   say('Loading profile…');
   try {
     const profRes = await fetch(`${API}/profile`, { credentials: 'include' });
-    if (!profRes.ok) throw new Error(`Profile ${profRes.status} — are you logged in to Job Hunt Pro at localhost:3456?`);
+    if (!profRes.ok) throw new Error(`Profile ${profRes.status} — are you logged in to Job Hunt Pro?`);
     const profile = await profRes.json();
 
     const resumeRes = await fetch(`${API}/resume-download`, { credentials: 'include' });

@@ -160,7 +160,7 @@
   // Auto-fill on page load when URL hints ?jhp=autofill
   // Triggered by the "Apply with Autofill" button in Job Hunt Pro.
   // ============================================================
-  const API = 'http://localhost:3456/api';
+  const API = 'https://jobhunt-g4dj.onrender.com/api';
 
   async function autoFillFromServer() {
     try {
