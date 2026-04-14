@@ -174,6 +174,55 @@ Summary: ${profile.summary}`;
   });
 });
 
+// Called by the Chrome extension after the user clicks Submit on an ATS page.
+// Creates or updates an APPLIED row keyed by the portal URL so the dashboard
+// reflects reality without the user touching Job Hunt Pro.
+router.post('/auto/mark-applied', async (req, res) => {
+  try {
+    const { url, title, company } = req.body || {};
+    if (!url) return res.status(400).json({ error: 'url required' });
+
+    // Derive role + company from page title across ATS formats.
+    let role = title || '';
+    let derivedCompany = company || '';
+    const gh = (title || '').match(/Job Application for (.+?) at (.+)$/i);
+    const ash = (title || '').match(/^(.+?) at (.+?)( \| .*)?$/i);
+    if (gh)       { role = gh[1].trim();  derivedCompany = gh[2].trim(); }
+    else if (ash) { role = ash[1].trim(); derivedCompany = ash[2].trim(); }
+    if (!derivedCompany) {
+      try { derivedCompany = new URL(url).hostname.replace(/^(www\.|job-boards\.|jobs\.|boards\.)/, '').split('.')[0]; }
+      catch { derivedCompany = 'Unknown'; }
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const followUp = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    const existing = await pool.query(
+      'SELECT id, status FROM applications WHERE user_id=$1 AND portal_url=$2',
+      [req.userId, url]
+    );
+
+    if (existing.rows.length > 0) {
+      await pool.query(
+        `UPDATE applications SET status='APPLIED', applied_date=$1, follow_up_date=$2, updated_at=NOW()
+         WHERE id=$3 AND user_id=$4`,
+        [today, followUp, existing.rows[0].id, req.userId]
+      );
+      return res.json({ ok: true, created: false, id: existing.rows[0].id });
+    }
+
+    const ins = await pool.query(
+      `INSERT INTO applications (user_id, company, role, platform, portal_url, status, applied_date, follow_up_date, notes)
+       VALUES ($1,$2,$3,'Extension',$4,'APPLIED',$5,$6,$7)
+       RETURNING id`,
+      [req.userId, derivedCompany, role, url, today, followUp, `Auto-tracked via extension from ${url}`]
+    );
+    res.json({ ok: true, created: true, id: ins.rows[0].id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/auto/stats', async (req, res) => {
   const u = req.userId;
   const today = new Date().toISOString().split('T')[0];

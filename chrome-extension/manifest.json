@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Job Hunt Pro — Autofill",
+  "version": "0.1.0",
+  "description": "One-click autofill for Greenhouse / Lever / Ashby application forms, backed by your Job Hunt Pro profile.",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": [
+    "http://localhost:3456/*",
+    "https://*.greenhouse.io/*",
+    "https://job-boards.greenhouse.io/*",
+    "https://jobs.lever.co/*",
+    "https://jobs.ashbyhq.com/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Fill this application"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.greenhouse.io/*",
+        "https://job-boards.greenhouse.io/*",
+        "https://jobs.lever.co/*",
+        "https://jobs.ashbyhq.com/*"
+      ],
+      "js": ["field-map.js", "ats/greenhouse.js", "ats/lever.js", "ats/ashby.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

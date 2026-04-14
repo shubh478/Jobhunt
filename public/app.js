@@ -1580,9 +1580,38 @@ async function loadAutoQueue() {
       '<div style="font-size:11px;color:#64748b">' + esc(j.location) + (j.salary_range ? ' | ' + esc(j.salary_range) : '') + ' | ' + esc(j.platform) + '</div></div>' +
       scoreBadge +
       (j.portal_url ? '<a class="btn btn-sm btn-ghost" href="' + esc(j.portal_url) + '" target="_blank">View</a>' : '') +
+      (j.portal_url ? '<button class="btn btn-sm btn-primary" title="Open portal in new tab and auto-fill the form" onclick="applyWithAutofill(\'' + esc(j.portal_url).replace(/'/g, "\\'") + '\')">⚡ Auto Apply</button>' : '') +
       '<button class="btn btn-sm btn-danger" onclick="removeFromQueue(' + j.id + ')">Remove</button>' +
       '</div>';
   }).join('');
+}
+
+// Opens the portal URL with the ?jhp=autofill hint so the extension auto-fills on load.
+// Requires the Job Hunt Pro Chrome extension to be installed.
+function applyWithAutofill(url) {
+  if (!url) { toast('No portal URL on this job', true); return; }
+  var sep = url.indexOf('?') >= 0 ? '&' : '?';
+  window.open(url + sep + 'jhp=autofill', '_blank');
+}
+
+// Bulk flow — opens selected wishlist jobs in sequence (1s apart so Chrome doesn't block popups).
+// You Submit each one manually; extension auto-marks APPLIED after submit.
+async function applySelectedWithAutofill() {
+  var urls = [];
+  document.querySelectorAll('.queue-checkbox:checked').forEach(function(c) {
+    var row = c.closest('div');
+    var link = row && row.querySelector('a.btn-ghost');
+    if (link) urls.push(link.href);
+  });
+  if (urls.length === 0) { toast('Select jobs first', true); return; }
+  if (urls.length > 10 && !confirm('Open ' + urls.length + ' tabs? Chrome may block popups beyond ~10.')) return;
+  toast('Opening ' + urls.length + ' applications…');
+  for (var i = 0; i < urls.length; i++) {
+    var u = urls[i];
+    var sep = u.indexOf('?') >= 0 ? '&' : '?';
+    window.open(u + sep + 'jhp=autofill', '_blank');
+    await new Promise(function(r) { setTimeout(r, 1000); });
+  }
 }
 
 function selectAllQueue() {

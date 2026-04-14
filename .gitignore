@@ -4,3 +4,6 @@ uploads/*
 !uploads/.gitkeep
 .env
 .claude/
+.playwright-mcp/
+*.png
+skills-reference.md

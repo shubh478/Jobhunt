@@ -383,7 +383,11 @@
         <button class="btn btn-ghost" onclick="selectAllQueue()">Select All</button>
         <button class="btn btn-ghost" onclick="deselectAllQueue()">Deselect All</button>
         <button class="btn btn-primary" id="score-queue-btn" onclick="scoreQueuedJobs()" style="background:#8b5cf6">AI Score Jobs</button>
+        <button class="btn btn-primary" onclick="applySelectedWithAutofill()" title="Opens each selected job in a new tab; the extension auto-fills the form. You click Submit." style="background:linear-gradient(135deg,#2563eb,#7c3aed)">⚡ Auto Apply Selected</button>
         <span id="auto-queue-count" style="font-size:12px;color:#94a3b8"></span>
+      </div>
+      <div style="background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.25);border-radius:10px;padding:10px 13px;margin-bottom:12px;font-size:12px;color:#93c5fd">
+        ⚡ <strong>Auto Apply</strong> opens each portal in a new tab and auto-fills the form using your profile + resume. Review yellow-highlighted fields, then click Submit on the company's site. Requires the Job Hunt Pro Chrome extension (load from <code>chrome-extension/</code> folder in <code>chrome://extensions</code>, Developer Mode → Load unpacked).
       </div>
       <div id="auto-queue-list" style="max-height:400px;overflow-y:auto"></div>
     </div>

@@ -7,6 +7,22 @@ const { attachUser } = require('./lib/auth');
 const app = express();
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
+
+// CORS for the Chrome extension. Allows extension + localhost origins
+// to call /api/* with cookies. Personal local tool, not a public API.
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && (origin.startsWith('chrome-extension://') || origin.startsWith('http://localhost'))) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+    res.setHeader('Vary', 'Origin');
+  }
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
 app.use(attachUser);
 // index: false so GET / hits our handler (which redirects unauth users to /login.html)
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
