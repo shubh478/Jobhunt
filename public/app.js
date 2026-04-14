@@ -1586,12 +1586,34 @@ async function loadAutoQueue() {
   }).join('');
 }
 
+// Supported ATS hosts — must match chrome-extension/manifest.json content_scripts.matches
+var SUPPORTED_ATS_HOSTS = /(^|\.)(greenhouse\.io|lever\.co|ashbyhq\.com)$/i;
+function isSupportedATS(url) {
+  try { return SUPPORTED_ATS_HOSTS.test(new URL(url).hostname); } catch { return false; }
+}
+
+// Resolve aggregator URL → direct company portal, then open with the ?jhp=autofill hint
+// if it lands on a supported ATS. Otherwise open raw so user can apply manually.
+async function openForAutofill(originalUrl) {
+  var finalUrl = await resolveJobUrl(originalUrl);
+  if (isSupportedATS(finalUrl)) {
+    var sep = finalUrl.indexOf('?') >= 0 ? '&' : '?';
+    window.open(finalUrl + sep + 'jhp=autofill', '_blank', 'noopener');
+    return { opened: true, autofill: true };
+  }
+  window.open(finalUrl, '_blank', 'noopener');
+  return { opened: true, autofill: false, finalUrl: finalUrl };
+}
+
 // Opens the portal URL with the ?jhp=autofill hint so the extension auto-fills on load.
 // Requires the Job Hunt Pro Chrome extension to be installed.
-function applyWithAutofill(url) {
+async function applyWithAutofill(url) {
   if (!url) { toast('No portal URL on this job', true); return; }
-  var sep = url.indexOf('?') >= 0 ? '&' : '?';
-  window.open(url + sep + 'jhp=autofill', '_blank');
+  toast('Resolving company portal…');
+  var result = await openForAutofill(url);
+  if (!result.autofill) {
+    toast('Not on Greenhouse/Lever/Ashby — opened for manual apply', true);
+  }
 }
 
 // Bulk flow — opens selected wishlist jobs in sequence (1s apart so Chrome doesn't block popups).
@@ -1605,13 +1627,14 @@ async function applySelectedWithAutofill() {
   });
   if (urls.length === 0) { toast('Select jobs first', true); return; }
   if (urls.length > 10 && !confirm('Open ' + urls.length + ' tabs? Chrome may block popups beyond ~10.')) return;
-  toast('Opening ' + urls.length + ' applications…');
+  toast('Resolving ' + urls.length + ' portals…');
+  var autofilled = 0, manual = 0;
   for (var i = 0; i < urls.length; i++) {
-    var u = urls[i];
-    var sep = u.indexOf('?') >= 0 ? '&' : '?';
-    window.open(u + sep + 'jhp=autofill', '_blank');
+    var result = await openForAutofill(urls[i]);
+    if (result.autofill) autofilled++; else manual++;
     await new Promise(function(r) { setTimeout(r, 1000); });
   }
+  toast('Opened ' + autofilled + ' auto-fill • ' + manual + ' manual (not on GH/Lever/Ashby)');
 }
 
 function selectAllQueue() {
