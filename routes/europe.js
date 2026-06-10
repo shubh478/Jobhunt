@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db/pool');
+const playbook = require('../lib/europe-playbook');
 
 // =================== REFERENCE DATA ===================
 // Static reference data for the Europe Job Prep section. Sourced from Jun 2026
@@ -870,6 +871,11 @@ const COUNTRY_PLANS = {
 // =================== ROUTES ===================
 
 router.get('/europe/reference', (req, res) => {
+  // Send lightweight playbook summary (country codes only) — full data fetched lazily per country
+  const playbookIndex = Object.keys(playbook).reduce((acc, code) => {
+    acc[code] = { code, name: playbook[code].name, flag: playbook[code].flag, hasPlaybook: true };
+    return acc;
+  }, {});
   res.json({
     countries: COUNTRIES,
     companies: COMPANIES,
@@ -877,15 +883,24 @@ router.get('/europe/reference', (req, res) => {
     prepPlan: PREP_PLAN,
     anchors: ANCHORS,
     countdownExplainer: COUNTDOWN_EXPLAINER,
-    countryPlans: COUNTRY_PLANS
+    countryPlans: COUNTRY_PLANS,    // keep legacy data for backward compat
+    playbookIndex                    // new: which countries have deep playbooks
   });
+});
+
+router.get('/europe/playbook/:code', (req, res) => {
+  const code = (req.params.code || '').toUpperCase();
+  const data = playbook[code];
+  if (!data) return res.status(404).json({ error: 'Playbook not found for ' + code });
+  res.json(data);
 });
 
 router.get('/europe/country/:code', (req, res) => {
   const code = (req.params.code || '').toUpperCase();
-  const plan = COUNTRY_PLANS[code];
-  if (!plan) return res.status(404).json({ error: 'Country not found' });
-  res.json(plan);
+  // Prefer deep playbook if available, fall back to legacy country plan
+  const data = playbook[code] || COUNTRY_PLANS[code];
+  if (!data) return res.status(404).json({ error: 'Country not found' });
+  res.json(data);
 });
 
 router.get('/europe/progress', async (req, res) => {

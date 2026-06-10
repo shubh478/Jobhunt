@@ -1180,11 +1180,120 @@
     display: flex; align-items: center; gap: 10px;
   }
 
+  /* ===== Playbook (rich country modal) ===== */
+  .eu-pb-sec { animation: fadeIn .25s ease; }
+  .eu-pb-h3 { font-size: 15px; font-weight: 700; margin: 14px 0 12px; color: var(--text-1); letter-spacing: -0.01em; }
+
+  /* Visa cards */
+  .eu-visa-card {
+    background: var(--bg-1);
+    border: 1px solid var(--border-1);
+    border-radius: var(--radius-md);
+    padding: 16px 18px;
+    margin-bottom: 12px;
+    transition: border-color .2s;
+  }
+  .eu-visa-card:hover { border-color: var(--border-brand); }
+  .eu-visa-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+  .eu-visa-name { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+  .eu-visa-code { font-size: 10px; color: var(--text-4); font-weight: 700; letter-spacing: 0.05em; margin-top: 3px; }
+  .eu-visa-recommended {
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    color: #1a1a00;
+    padding: 5px 12px;
+    border-radius: 9999px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .eu-visa-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .eu-visa-grid > div {
+    background: rgba(9,9,11,.4);
+    border: 1px solid rgba(63,63,70,.3);
+    border-radius: 8px;
+    padding: 9px 11px;
+  }
+  .eu-visa-label { font-size: 9px; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700; margin-bottom: 3px; }
+  .eu-visa-value { font-size: 12px; color: var(--text-1); font-weight: 500; line-height: 1.4; }
+  .eu-visa-prosconslist { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .eu-visa-pros, .eu-visa-cons {
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .eu-visa-pros { background: rgba(34,197,94,.06); border: 1px solid rgba(34,197,94,.2); color: var(--text-2); }
+  .eu-visa-cons { background: rgba(245,158,11,.06); border: 1px solid rgba(245,158,11,.2); color: var(--text-2); }
+  .eu-visa-pclabel { font-size: 10px; font-weight: 800; margin-bottom: 6px; letter-spacing: 0.06em; }
+  .eu-visa-pros .eu-visa-pclabel { color: #86efac; }
+  .eu-visa-cons .eu-visa-pclabel { color: #fcd34d; }
+
+  /* Company detail cards */
+  .eu-co-detail {
+    background: var(--bg-1);
+    border: 1px solid var(--border-1);
+    border-radius: var(--radius-md);
+    padding: 16px 18px;
+    margin-bottom: 12px;
+    transition: all .2s;
+  }
+  .eu-co-detail:hover { border-color: var(--border-brand); transform: translateY(-1px); }
+  .eu-co-detail-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+  .eu-co-detail-name { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+  .eu-co-detail-city { font-size: 11px; color: var(--text-4); margin-top: 3px; }
+  .eu-co-detail-salary {
+    background: linear-gradient(135deg, rgba(132,204,22,.12), rgba(34,197,94,.08));
+    border: 1px solid rgba(132,204,22,.3);
+    color: #bef264;
+    padding: 5px 12px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .eu-co-detail-stack {
+    font-family: 'SF Mono', Menlo, monospace;
+    font-size: 11px;
+    color: #a5b4fc;
+    background: rgba(99,102,241,.08);
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin: 10px 0;
+    border-left: 2px solid rgba(99,102,241,.4);
+  }
+  .eu-co-detail-row {
+    font-size: 13px;
+    color: var(--text-2);
+    line-height: 1.55;
+    margin: 8px 0;
+  }
+  .eu-co-detail-row strong { color: var(--text-1); }
+  .eu-co-detail-link {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--brand-2);
+    font-weight: 600;
+  }
+  .eu-co-detail-link:hover { color: var(--brand-4); }
+
+  .eu-cities-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 12px;
+  }
+
   @media (max-width: 640px) {
     .eu-modal-hero { padding: 22px 20px; }
     .eu-modal-body { padding: 18px 20px 24px; }
     .eu-modal-title { font-size: 20px; }
-    .eu-path-grid { grid-template-columns: 1fr; }
+    .eu-path-grid, .eu-visa-grid, .eu-visa-prosconslist { grid-template-columns: 1fr; }
   }
 
   @media (max-width: 768px) {

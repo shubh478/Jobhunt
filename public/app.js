@@ -2506,19 +2506,303 @@ function renderEuropeCountries() {
   }).join('');
 }
 
-function openCountryPlan(code) {
-  if (!europeRef || !europeRef.countryPlans || !europeRef.countryPlans[code]) return;
-  var plan = europeRef.countryPlans[code];
+async function openCountryPlan(code) {
+  if (!europeRef) return;
+  var hasPlaybook = europeRef.playbookIndex && europeRef.playbookIndex[code];
 
+  // Show modal immediately with loading state
+  document.getElementById('eu-country-modal-hero').innerHTML =
+    '<div class="eu-modal-flag">⏳</div><div class="eu-modal-title">Loading…</div>';
+  document.getElementById('eu-country-modal-tabs').innerHTML = '';
+  document.getElementById('eu-country-modal-body').innerHTML = '<div class="loading-overlay">Loading playbook…</div>';
+  document.getElementById('eu-country-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  var data;
+  if (hasPlaybook) {
+    try { data = await api('/api/europe/playbook/' + code); }
+    catch (e) { data = europeRef.countryPlans && europeRef.countryPlans[code]; }
+  } else {
+    data = europeRef.countryPlans && europeRef.countryPlans[code];
+  }
+  if (!data) {
+    document.getElementById('eu-country-modal-body').innerHTML = '<p style="padding:20px;color:#fca5a5">No data for this country yet.</p>';
+    return;
+  }
+
+  if (hasPlaybook) renderRichPlaybook(data);
+  else renderLegacyPlan(data);
+}
+
+function renderRichPlaybook(d) {
   // Hero
+  document.getElementById('eu-country-modal-hero').innerHTML =
+    '<div class="eu-modal-flag">' + d.flag + '</div>' +
+    '<div class="eu-modal-title">' + esc(d.name) + ' · ' + esc(d.capital || '') + '</div>' +
+    '<div class="eu-modal-subtitle">' + esc(d.tagline || '') + '</div>';
+
+  // Section tabs
+  var sections = [
+    { id: 'overview', label: 'Overview', icon: '🌍' },
+    { id: 'visas', label: 'Visa options', icon: '🛂' },
+    { id: 'market', label: 'Market 2026', icon: '📈' },
+    { id: 'companies', label: 'Top companies', icon: '🏢' },
+    { id: 'prep', label: 'Prep roadmap', icon: '📋' },
+    { id: 'interviews', label: 'Interview guide', icon: '🎯' },
+    { id: 'cost', label: 'Cost & salary', icon: '💶' },
+    { id: 'living', label: 'Living info', icon: '🏠' },
+    { id: 'community', label: 'Community', icon: '👥' },
+    { id: 'action', label: '90-day action', icon: '⚡' }
+  ];
+  document.getElementById('eu-country-modal-tabs').innerHTML = sections.map(function(s, i) {
+    return '<button class="eu-path-tab' + (i === 0 ? ' active' : '') + '" onclick="switchPlaybookSection(\'' + s.id + '\', this)">' +
+      '<span>' + s.icon + '</span> ' + s.label + '</button>';
+  }).join('');
+
+  var html = '';
+
+  // === Overview ===
+  html += '<div class="eu-pb-sec" data-pb-sec="overview">';
+  if (d.overview) {
+    html += '<div class="eu-path-summary">' + esc(d.overview.why) + '</div>';
+    if (d.overview.key_facts) {
+      html += '<div class="eu-path-steps"><div class="eu-path-steps-title">📌 Key facts</div>';
+      html += d.overview.key_facts.map(function(f) { return '<div class="eu-path-step"><span class="eu-path-step-num">•</span><span>' + esc(f) + '</span></div>'; }).join('');
+      html += '</div>';
+    }
+  }
+  html += '</div>';
+
+  // === Visa options ===
+  html += '<div class="eu-pb-sec" data-pb-sec="visas" style="display:none">';
+  if (d.visaTypes && d.visaTypes.length) {
+    html += '<p class="eu-sub" style="margin-bottom:14px">Pick the visa that fits your situation. ' + d.visaTypes.length + ' options available.</p>';
+    html += d.visaTypes.map(function(v) {
+      return '<div class="eu-visa-card">' +
+        '<div class="eu-visa-head">' +
+          '<div><div class="eu-visa-name">' + esc(v.name) + '</div>' +
+          '<div class="eu-visa-code">' + esc(v.code) + '</div></div>' +
+          (v.best_for && v.best_for.indexOf('⭐') !== -1 ? '<span class="eu-visa-recommended">★ Recommended</span>' : '') +
+        '</div>' +
+        '<div class="eu-visa-grid">' +
+          '<div><div class="eu-visa-label">Who for</div><div class="eu-visa-value">' + esc(v.who_for) + '</div></div>' +
+          '<div><div class="eu-visa-label">Threshold</div><div class="eu-visa-value">' + esc(v.threshold) + '</div></div>' +
+          '<div><div class="eu-visa-label">Processing</div><div class="eu-visa-value">' + esc(v.processing) + '</div></div>' +
+          '<div><div class="eu-visa-label">Cost</div><div class="eu-visa-value">' + esc(v.cost) + '</div></div>' +
+          '<div><div class="eu-visa-label">Family</div><div class="eu-visa-value">' + esc(v.family) + '</div></div>' +
+          '<div><div class="eu-visa-label">PR path</div><div class="eu-visa-value">' + esc(v.pr_path) + '</div></div>' +
+        '</div>' +
+        '<div class="eu-visa-prosconslist">' +
+          '<div class="eu-visa-pros"><div class="eu-visa-pclabel">✓ Pros</div>' + (v.pros || []).map(function(p) { return '<div>• ' + esc(p) + '</div>'; }).join('') + '</div>' +
+          '<div class="eu-visa-cons"><div class="eu-visa-pclabel">⚠ Cons</div>' + (v.cons || []).map(function(p) { return '<div>• ' + esc(p) + '</div>'; }).join('') + '</div>' +
+        '</div>' +
+        (v.best_for ? '<div class="eu-path-verdict" style="margin-top:12px"><div class="eu-path-verdict-label">When to use</div>' + esc(v.best_for) + '</div>' : '') +
+      '</div>';
+    }).join('');
+  }
+  html += '</div>';
+
+  // === Market 2026 ===
+  html += '<div class="eu-pb-sec" data-pb-sec="market" style="display:none">';
+  if (d.market2026) {
+    var m = d.market2026;
+    html += '<div class="eu-path-summary"><strong>📊 Hiring trend:</strong> ' + esc(m.hiring_trend) + '</div>';
+    html += '<div class="eu-path-grid">';
+    if (m.faang_presence) html += '<div class="eu-path-stat"><div class="eu-path-stat-label">FAANG presence</div><div class="eu-path-stat-value">' + esc(m.faang_presence) + '</div></div>';
+    if (m.indian_engineers) html += '<div class="eu-path-stat"><div class="eu-path-stat-label">Indian engineers</div><div class="eu-path-stat-value">' + esc(m.indian_engineers) + '</div></div>';
+    if (m.layoff_status) html += '<div class="eu-path-stat"><div class="eu-path-stat-label">Layoff status</div><div class="eu-path-stat-value">' + esc(m.layoff_status) + '</div></div>';
+    if (m.salary_trend) html += '<div class="eu-path-stat"><div class="eu-path-stat-label">Salary trend</div><div class="eu-path-stat-value">' + esc(m.salary_trend) + '</div></div>';
+    if (m.remote_policy) html += '<div class="eu-path-stat"><div class="eu-path-stat-label">Remote policy</div><div class="eu-path-stat-value">' + esc(m.remote_policy) + '</div></div>';
+    if (m.visa_friendly_companies) html += '<div class="eu-path-stat"><div class="eu-path-stat-label">Visa-friendly cos</div><div class="eu-path-stat-value">' + esc(m.visa_friendly_companies) + '</div></div>';
+    html += '</div>';
+
+    if (m.hot_skills && m.hot_skills.length) {
+      html += '<div class="eu-path-steps"><div class="eu-path-steps-title">🔥 Hot skills</div><div class="eu-path-targets">';
+      html += m.hot_skills.map(function(s) { return '<span class="eu-target-pill" style="background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.3);color:#86efac">' + esc(s) + '</span>'; }).join('');
+      html += '</div></div>';
+    }
+    if (m.cold_skills && m.cold_skills.length) {
+      html += '<div class="eu-path-steps"><div class="eu-path-steps-title">❄️ Cold skills (avoid leading with these)</div><div class="eu-path-targets">';
+      html += m.cold_skills.map(function(s) { return '<span class="eu-target-pill" style="background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.2);color:#fca5a5">' + esc(s) + '</span>'; }).join('');
+      html += '</div></div>';
+    }
+  }
+  html += '</div>';
+
+  // === Companies ===
+  html += '<div class="eu-pb-sec" data-pb-sec="companies" style="display:none">';
+  if (d.companies) {
+    var renderCoSection = function(title, list, badgeClass) {
+      if (!list || !list.length) return '';
+      var s = '<h3 class="eu-pb-h3"><span class="eu-tier-badge ' + badgeClass + '">' + title + '</span></h3>';
+      s += list.map(function(c) {
+        return '<div class="eu-co-detail">' +
+          '<div class="eu-co-detail-head">' +
+            '<div><div class="eu-co-detail-name">' + esc(c.name) + '</div>' +
+            (c.city ? '<div class="eu-co-detail-city">📍 ' + esc(c.city) + '</div>' : '') + '</div>' +
+            (c.salary ? '<div class="eu-co-detail-salary">' + esc(c.salary) + '</div>' : '') +
+          '</div>' +
+          (c.stack ? '<div class="eu-co-detail-stack">⚙️ ' + esc(c.stack) + '</div>' : '') +
+          (c.why ? '<div class="eu-co-detail-row"><strong>Why apply:</strong> ' + esc(c.why) + '</div>' : '') +
+          (c.interview ? '<div class="eu-co-detail-row"><strong>Interview:</strong> ' + esc(c.interview) + '</div>' : '') +
+          (c.prep_tips ? '<div class="eu-co-detail-row"><strong>Prep tips:</strong> ' + esc(c.prep_tips) + '</div>' : '') +
+          (c.apply_at ? '<a class="eu-co-detail-link" href="https://' + esc(c.apply_at.replace(/^https?:\/\//, '')) + '" target="_blank">🔗 Apply at ' + esc(c.apply_at) + ' →</a>' : '') +
+          (c.path ? '<div class="eu-co-detail-row"><strong>Transfer path:</strong> ' + esc(c.path) + '</div>' : '') +
+          (c.note ? '<div class="eu-co-detail-row" style="color:#a5b4fc">💡 ' + esc(c.note) + '</div>' : '') +
+        '</div>';
+      }).join('');
+      return s;
+    };
+    html += renderCoSection('Tier 1 · Apply immediately', d.companies.tier1_immediate, 'eu-tier-1');
+    html += renderCoSection('Tier 2 · After 2 months prep', d.companies.tier2_after_prep, 'eu-tier-2');
+    html += renderCoSection('Tier 3 · Indian-arm transfer', d.companies.tier3_transfer, 'eu-tier-3');
+  }
+  html += '</div>';
+
+  // === Prep Roadmap ===
+  html += '<div class="eu-pb-sec" data-pb-sec="prep" style="display:none">';
+  if (d.prepRoadmap && d.prepRoadmap.length) {
+    html += '<p class="eu-sub" style="margin-bottom:14px">Country-specific 6-month plan. Why each task matters HERE.</p>';
+    html += '<div class="eu-timeline" style="padding-left:24px">';
+    html += d.prepRoadmap.map(function(m, idx) {
+      return '<div class="eu-month">' +
+        '<span class="eu-month-num">' + m.month + '</span>' +
+        '<div class="eu-month-header"><div class="eu-month-title">Month ' + m.month + ' — ' + esc(m.focus) + '</div></div>' +
+        (m.tasks || []).map(function(t) {
+          return '<div class="eu-task"><div class="eu-task-check"></div><div class="eu-task-text">' + esc(t) + '</div></div>';
+        }).join('') +
+        (m.why_nl_specific || m.why_de_specific || m.why_se_specific || m.why_ie_specific || m.why_fi_specific ? '<div class="eu-path-verdict" style="margin-top:8px"><div class="eu-path-verdict-label">Why this matters here</div>' + esc(m.why_nl_specific || m.why_de_specific || m.why_se_specific || m.why_ie_specific || m.why_fi_specific) + '</div>' : '') +
+      '</div>';
+    }).join('');
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // === Interview Guide ===
+  html += '<div class="eu-pb-sec" data-pb-sec="interviews" style="display:none">';
+  if (d.interviewGuide && d.interviewGuide.length) {
+    html += d.interviewGuide.map(function(g) {
+      return '<div class="eu-co-detail">' +
+        '<div class="eu-co-detail-name" style="font-size:18px">' + esc(g.company) + '</div>' +
+        (g.format ? '<div class="eu-co-detail-row"><strong>Format:</strong> ' + esc(g.format) + '</div>' : '') +
+        (g.topics ? '<div class="eu-co-detail-row" style="margin-top:10px"><strong>Topics:</strong></div><div class="eu-path-targets">' + g.topics.map(function(t) { return '<span class="eu-target-pill">' + esc(t) + '</span>'; }).join('') + '</div>' : '') +
+        (g.sample_questions ? '<div class="eu-co-detail-row" style="margin-top:10px"><strong>Sample questions:</strong></div>' + g.sample_questions.map(function(q) { return '<div class="eu-path-step"><span class="eu-path-step-num">Q</span><span>' + esc(q) + '</span></div>'; }).join('') : '') +
+        (g.culture ? '<div class="eu-co-detail-row"><strong>Culture:</strong> ' + esc(g.culture) + '</div>' : '') +
+        (g.gotchas ? '<div class="eu-path-verdict" style="margin-top:10px"><div class="eu-path-verdict-label">⚠️ Gotchas</div>' + esc(g.gotchas) + '</div>' : '') +
+      '</div>';
+    }).join('');
+  }
+  html += '</div>';
+
+  // === Cost & Salary ===
+  html += '<div class="eu-pb-sec" data-pb-sec="cost" style="display:none">';
+  if (d.costOfLiving) {
+    html += '<h3 class="eu-pb-h3">💸 Cost of living</h3>';
+    var cl = d.costOfLiving;
+    html += '<div class="eu-path-grid">';
+    Object.keys(cl).forEach(function(k) {
+      if (typeof cl[k] === 'string' && k !== 'verdict') {
+        html += '<div class="eu-path-stat"><div class="eu-path-stat-label">' + esc(k.replace(/_/g, ' ')) + '</div><div class="eu-path-stat-value">' + esc(cl[k]) + '</div></div>';
+      }
+      if (typeof cl[k] === 'object' && cl[k] !== null) {
+        // nested city cost (Germany berlin/munich)
+        html += '<div class="eu-path-stat" style="grid-column:1/-1"><div class="eu-path-stat-label">' + esc(k.toUpperCase()) + '</div>';
+        Object.keys(cl[k]).forEach(function(kk) {
+          html += '<div style="font-size:12px;margin-top:4px"><span style="color:var(--text-4)">' + esc(kk.replace(/_/g, ' ')) + ':</span> ' + esc(cl[k][kk]) + '</div>';
+        });
+        html += '</div>';
+      }
+    });
+    html += '</div>';
+    if (cl.verdict) html += '<div class="eu-path-verdict" style="margin-top:12px"><div class="eu-path-verdict-label">Verdict</div>' + esc(cl.verdict) + '</div>';
+  }
+  if (d.taxSalary) {
+    html += '<h3 class="eu-pb-h3" style="margin-top:20px">💰 Tax & salary</h3>';
+    html += '<div class="eu-path-grid">';
+    Object.keys(d.taxSalary).forEach(function(k) {
+      html += '<div class="eu-path-stat"><div class="eu-path-stat-label">' + esc(k.replace(/_/g, ' ')) + '</div><div class="eu-path-stat-value">' + esc(d.taxSalary[k]) + '</div></div>';
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // === Living info ===
+  html += '<div class="eu-pb-sec" data-pb-sec="living" style="display:none">';
+  if (d.livingInfo) {
+    var li = d.livingInfo;
+    if (li.cities && li.cities.length) {
+      html += '<h3 class="eu-pb-h3">🏙️ Cities</h3>';
+      html += '<div class="eu-cities-grid">';
+      html += li.cities.map(function(c) {
+        return '<div class="eu-visa-card">' +
+          '<div class="eu-visa-name">' + esc(c.name) + '</div>' +
+          (c.vibe ? '<div class="eu-co-detail-row">' + esc(c.vibe) + '</div>' : '') +
+          (c.expat_density ? '<div class="eu-co-detail-row"><strong>Expat density:</strong> ' + esc(c.expat_density) + '</div>' : '') +
+          (c.rent_1br ? '<div class="eu-co-detail-row"><strong>1BR rent:</strong> ' + esc(c.rent_1br) + '</div>' : '') +
+          (c.best_for ? '<div class="eu-co-detail-row"><strong>Best for:</strong> ' + esc(c.best_for) + '</div>' : '') +
+        '</div>';
+      }).join('');
+      html += '</div>';
+    }
+    ['transport', 'healthcare', 'banking', 'registration', 'social', 'housing_tip'].forEach(function(k) {
+      if (li[k]) html += '<div class="eu-path-stat" style="margin-top:10px"><div class="eu-path-stat-label">' + k.replace(/_/g, ' ') + '</div><div class="eu-path-stat-value">' + esc(li[k]) + '</div></div>';
+    });
+  }
+  html += '</div>';
+
+  // === Community ===
+  html += '<div class="eu-pb-sec" data-pb-sec="community" style="display:none">';
+  if (d.communities && d.communities.length) {
+    html += '<p class="eu-sub" style="margin-bottom:14px">Indian diaspora, recruiters, meetups, forums. Network = job leads.</p>';
+    html += d.communities.map(function(c) {
+      return '<div class="eu-visa-card" style="margin-bottom:10px">' +
+        '<div class="eu-co-detail-head">' +
+          '<div class="eu-co-detail-name">' + esc(c.name) + '</div>' +
+          '<span class="eu-target-pill">' + esc(c.type) + '</span>' +
+        '</div>' +
+        '<div class="eu-co-detail-row">' + esc(c.what) + '</div>' +
+        (c.link ? '<a class="eu-co-detail-link" href="' + esc(c.link) + '" target="_blank">🔗 ' + esc(c.link) + '</a>' : '') +
+      '</div>';
+    }).join('');
+  }
+  html += '</div>';
+
+  // === 90-day action ===
+  html += '<div class="eu-pb-sec" data-pb-sec="action" style="display:none">';
+  if (d.actionPlan90Day && d.actionPlan90Day.length) {
+    html += '<p class="eu-sub" style="margin-bottom:14px">Week-by-week action — start TODAY.</p>';
+    html += d.actionPlan90Day.map(function(w, i) {
+      return '<div class="eu-task" style="cursor:default">' +
+        '<div class="eu-task-check" style="background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;border-color:transparent">' + (i + 1) + '</div>' +
+        '<div class="eu-task-text"><strong>Week ' + esc(w.week) + ':</strong> ' + esc(w.action) + '</div>' +
+      '</div>';
+    }).join('');
+  }
+  html += '</div>';
+
+  document.getElementById('eu-country-modal-body').innerHTML = html;
+}
+
+function switchPlaybookSection(id, btn) {
+  document.querySelectorAll('#eu-country-modal-tabs .eu-path-tab').forEach(function(t) { t.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  document.querySelectorAll('.eu-pb-sec').forEach(function(s) {
+    s.style.display = s.getAttribute('data-pb-sec') === id ? '' : 'none';
+  });
+  // Scroll modal body to top on section change
+  var body = document.getElementById('eu-country-modal-body');
+  if (body) body.scrollTop = 0;
+}
+
+// Legacy renderer for countries without rich playbook yet (CH/BE/DK/AT/FI)
+function renderLegacyPlan(plan) {
   document.getElementById('eu-country-modal-hero').innerHTML =
     '<div class="eu-modal-flag">' + plan.flag + '</div>' +
     '<div class="eu-modal-title">' + esc(plan.name) + '</div>' +
-    '<div class="eu-modal-subtitle">' + esc(plan.intro) + '</div>';
+    '<div class="eu-modal-subtitle">' + esc(plan.intro || '') + '</div>';
 
-  // Tabs
   var tabsEl = document.getElementById('eu-country-modal-tabs');
-  tabsEl.innerHTML = plan.paths.map(function(p, idx) {
+  tabsEl.innerHTML = (plan.paths || []).map(function(p, idx) {
     var agePill = p.age === 'under30' ? '<span class="age-pill">Under 30</span>' :
                   p.age === 'post30' ? '<span class="age-pill">Post 30</span>' : '';
     return '<button class="eu-path-tab' + (idx === 0 ? ' active' : '') + '" onclick="switchEuropePath(\'' + esc(p.id) + '\', this)">' +
@@ -2526,36 +2810,24 @@ function openCountryPlan(code) {
     '</button>';
   }).join('');
 
-  // Body sections
-  var body = document.getElementById('eu-country-modal-body');
-  body.innerHTML = plan.paths.map(function(p, idx) {
+  document.getElementById('eu-country-modal-body').innerHTML = (plan.paths || []).map(function(p, idx) {
     return '<div class="eu-path-section' + (idx === 0 ? ' active' : '') + '" data-path-id="' + esc(p.id) + '">' +
       '<div class="eu-path-summary">' + esc(p.summary) + '</div>' +
       '<div class="eu-path-grid">' +
         '<div class="eu-path-stat"><div class="eu-path-stat-label">Threshold</div><div class="eu-path-stat-value">' + esc(p.threshold) + '</div></div>' +
         '<div class="eu-path-stat"><div class="eu-path-stat-label">Timeline</div><div class="eu-path-stat-value">' + esc(p.timeline) + '</div></div>' +
         '<div class="eu-path-stat"><div class="eu-path-stat-label">Salary</div><div class="eu-path-stat-value">' + esc(p.salary) + '</div></div>' +
-        '<div class="eu-path-stat"><div class="eu-path-stat-label">Type</div><div class="eu-path-stat-value">' + esc(p.kind === 'job' ? 'Direct employment' : p.kind === 'phd' ? 'Funded research position' : 'Hybrid path') + '</div></div>' +
+        '<div class="eu-path-stat"><div class="eu-path-stat-label">Type</div><div class="eu-path-stat-value">' + esc(p.kind === 'job' ? 'Direct employment' : p.kind === 'phd' ? 'Funded research' : 'Hybrid') + '</div></div>' +
       '</div>' +
-      '<div class="eu-path-steps">' +
-        '<div class="eu-path-steps-title">📋 Step by step</div>' +
-        p.steps.map(function(s, i) {
-          return '<div class="eu-path-step"><span class="eu-path-step-num">' + (i + 1) + '</span><span>' + esc(s) + '</span></div>';
-        }).join('') +
+      '<div class="eu-path-steps"><div class="eu-path-steps-title">📋 Steps</div>' +
+        (p.steps || []).map(function(s, i) { return '<div class="eu-path-step"><span class="eu-path-step-num">' + (i + 1) + '</span><span>' + esc(s) + '</span></div>'; }).join('') +
       '</div>' +
-      '<div class="eu-path-steps">' +
-        '<div class="eu-path-steps-title">🎯 Targets (' + (p.kind === 'phd' ? 'universities' : p.kind === 'combined' ? 'post-PhD employers' : 'companies') + ')</div>' +
-        '<div class="eu-path-targets">' + p.targets.map(function(t) { return '<span class="eu-target-pill">' + esc(t) + '</span>'; }).join('') + '</div>' +
+      '<div class="eu-path-steps"><div class="eu-path-steps-title">🎯 Targets</div>' +
+        '<div class="eu-path-targets">' + (p.targets || []).map(function(t) { return '<span class="eu-target-pill">' + esc(t) + '</span>'; }).join('') + '</div>' +
       '</div>' +
-      '<div class="eu-path-verdict">' +
-        '<div class="eu-path-verdict-label">Verdict</div>' +
-        esc(p.verdict) +
-      '</div>' +
+      '<div class="eu-path-verdict"><div class="eu-path-verdict-label">Verdict</div>' + esc(p.verdict) + '</div>' +
     '</div>';
   }).join('');
-
-  document.getElementById('eu-country-modal').classList.add('open');
-  document.body.style.overflow = 'hidden';
 }
 
 function switchEuropePath(pathId, btn) {
