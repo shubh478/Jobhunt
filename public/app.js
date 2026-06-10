@@ -2399,27 +2399,25 @@ loadDashboard();
 renderResources();
 
 // ============================== EUROPE JOB PREP ==============================
-var europeRef = null;      // reference data from /api/europe/reference
-var europeProgress = {};   // map of "type:key" -> { status, notes }
-var europeCompanyFilter = 'ALL';
+var europeRef = null;
+var europeProgress = {};
+var europeCompanyFilters = { tier: 'ALL', country: 'ALL' };
+var EU_BIRTHDAY = new Date('2027-02-01T00:00:00Z');
 
 async function loadEurope() {
   try {
-    if (!europeRef) {
-      europeRef = await api('/api/europe/reference');
-    }
+    if (!europeRef) europeRef = await api('/api/europe/reference');
     var prog = await api('/api/europe/progress');
     europeProgress = {};
     prog.forEach(function(p) { europeProgress[p.item_type + ':' + p.item_key] = { status: p.status, notes: p.notes }; });
-  } catch (e) {
-    console.error('Europe load failed', e);
-    return;
-  }
-  renderEuropeAnchors();
+  } catch (e) { console.error('Europe load failed', e); return; }
+  renderEuropeHero();
+  renderEuropeKPIs();
   renderEuropeCountries();
   renderEuropeCompanies();
   renderEuropeSkills();
   renderEuropePlan();
+  calcEuropeSalaryAll();
 }
 
 function switchEuropeSection(name, btn) {
@@ -2427,78 +2425,161 @@ function switchEuropeSection(name, btn) {
     var el = document.getElementById('europe-sec-' + s);
     if (el) el.style.display = (s === name ? '' : 'none');
   });
-  document.querySelectorAll('#tab-europe .chip').forEach(function(c) { c.classList.remove('active'); });
+  document.querySelectorAll('#tab-europe .eu-tab').forEach(function(c) { c.classList.remove('active'); });
   if (btn) btn.classList.add('active');
 }
 
-function renderEuropeAnchors() {
-  var c = document.getElementById('europe-anchors');
-  if (!c || !europeRef) return;
-  c.innerHTML = europeRef.anchors.map(function(a) {
-    return '<div class="europe-anchor' + (a.danger ? ' danger' : '') + '">' +
-      '<div class="ea-label">' + a.emoji + ' ' + esc(a.label) + '</div>' +
-      '<div class="ea-value">' + esc(a.value) + '</div>' +
-      '</div>';
-  }).join('');
+function renderEuropeHero() {
+  var el = document.getElementById('eu-countdown-days');
+  if (!el) return;
+  var now = new Date();
+  var diffMs = EU_BIRTHDAY - now;
+  var days = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+  el.textContent = days;
+}
+
+function renderEuropeKPIs() {
+  if (!europeRef) return;
+  // Plan progress
+  var planTotal = europeRef.prepPlan.length;
+  var planDone = europeRef.prepPlan.filter(function(t) {
+    var p = europeProgress['task:' + t.key]; return p && p.status === 'DONE';
+  }).length;
+  var planPct = planTotal ? Math.round(planDone / planTotal * 100) : 0;
+  document.getElementById('eu-kpi-plan').textContent = planPct + '%';
+
+  // Skills progress
+  var skillsTotal = europeRef.skills.length;
+  var skillsDone = europeRef.skills.filter(function(s) {
+    var p = europeProgress['skill:' + s.key]; return p && p.status === 'DONE';
+  }).length;
+  var skillsPct = skillsTotal ? Math.round(skillsDone / skillsTotal * 100) : 0;
+  document.getElementById('eu-kpi-skills').textContent = skillsPct + '%';
+
+  // Company stats
+  var stages = { APPLIED: 0, SCREENING: 0, INTERVIEW: 0, OFFER: 0 };
+  europeRef.companies.forEach(function(co) {
+    var p = europeProgress['company:' + co.key];
+    if (!p) return;
+    if (p.status === 'APPLIED') stages.APPLIED++;
+    if (p.status === 'SCREENING') stages.SCREENING++;
+    if (p.status === 'INTERVIEW') stages.INTERVIEW++;
+    if (p.status === 'OFFER') stages.OFFER++;
+  });
+  document.getElementById('eu-kpi-applied').textContent = stages.APPLIED + stages.SCREENING;
+  document.getElementById('eu-kpi-interview').textContent = stages.INTERVIEW;
+  document.getElementById('eu-kpi-offer').textContent = stages.OFFER;
 }
 
 function renderEuropeCountries() {
-  var tbody = document.getElementById('europe-countries-tbody');
-  var notes = document.getElementById('europe-country-notes');
-  if (!tbody || !europeRef) return;
+  var grid = document.getElementById('europe-countries-grid');
+  if (!grid || !europeRef) return;
   var sorted = europeRef.countries.slice().sort(function(a, b) { return a.rank - b.rank; });
-  tbody.innerHTML = sorted.map(function(co) {
-    var protBar = '<span style="color:' + (co.firing_protection >= 8 ? '#86efac' : co.firing_protection >= 6 ? '#fcd34d' : '#fca5a5') + ';font-weight:700">' + co.firing_protection + '/10</span>';
-    var rankBadge = co.rank <= 3 ? '<span class="tier-badge-1">#' + co.rank + '</span>' :
-                     co.rank <= 6 ? '<span class="tier-badge-2">#' + co.rank + '</span>' :
-                     '<span style="background:rgba(239,68,68,.15);color:#fca5a5;padding:3px 10px;border-radius:9999px;font-size:10px;font-weight:700">SKIP</span>';
-    return '<tr>' +
-      '<td>' + rankBadge + '</td>' +
-      '<td><strong>' + co.flag + ' ' + esc(co.name) + '</strong></td>' +
-      '<td>' + esc(co.visa) + '</td>' +
-      '<td><span style="color:#a5b4fc">under-30:</span> ' + esc(co.threshold_under30) + '<br><span style="color:#71717a;font-size:11px">30+:</span> <span style="font-size:11px">' + esc(co.threshold_30plus) + '</span></td>' +
-      '<td>' + esc(co.processing) + '</td>' +
-      '<td>' + protBar + '</td>' +
-      '<td>' + esc(co.english_jobs) + '</td>' +
-      '<td>' + esc(co.pr_years) + '</td>' +
-      '<td style="font-size:11px">' + esc(co.tax_benefit) + '</td>' +
-    '</tr>';
-  }).join('');
-  notes.innerHTML = sorted.map(function(co) {
-    return '<div class="country-note-card">' +
-      '<h4>' + co.flag + ' ' + esc(co.name) + '</h4>' +
-      '<p>' + esc(co.note) + '</p>' +
+  grid.innerHTML = sorted.map(function(co) {
+    var rankClass = co.rank === 1 ? 'gold' : co.rank <= 3 ? 'silver' : co.rank >= 7 ? 'skip' : '';
+    var rankBadgeClass = co.rank === 1 ? 'gold' : co.rank <= 3 ? 'silver' : co.rank <= 5 ? 'bronze' : 'skip';
+    var rankLabel = co.rank === 1 ? '#1 BEST PICK' : co.rank <= 3 ? '#' + co.rank + ' RECOMMENDED' : co.rank <= 6 ? '#' + co.rank : 'SKIP';
+    // firing protection meter (10 dots)
+    var meterCls = co.firing_protection >= 8 ? '' : co.firing_protection >= 6 ? 'medium' : 'weak';
+    var meterHtml = '<span class="eu-country-meter ' + meterCls + '">';
+    for (var i = 1; i <= 10; i++) {
+      meterHtml += '<span' + (i <= co.firing_protection ? ' class="on"' : '') + '></span>';
+    }
+    meterHtml += '</span>';
+
+    return '<div class="eu-country-card ' + rankClass + '">' +
+      '<div class="eu-country-rank ' + rankBadgeClass + '">' + rankLabel + '</div>' +
+      '<div class="eu-country-flag">' + co.flag + '</div>' +
+      '<div class="eu-country-name">' + esc(co.name) + '</div>' +
+      '<div class="eu-country-visa">' + esc(co.visa) + '</div>' +
+
+      '<div class="eu-country-stat"><span class="eu-country-stat-label">Threshold (under-30)</span><span class="eu-country-stat-value">' + esc(co.threshold_under30) + '</span></div>' +
+      '<div class="eu-country-stat"><span class="eu-country-stat-label">Processing</span><span class="eu-country-stat-value">' + esc(co.processing) + '</span></div>' +
+      '<div class="eu-country-stat"><span class="eu-country-stat-label">Firing protection</span><span class="eu-country-stat-value">' + co.firing_protection + '/10 ' + meterHtml + '</span></div>' +
+      '<div class="eu-country-stat"><span class="eu-country-stat-label">English jobs</span><span class="eu-country-stat-value">' + esc(co.english_jobs) + '</span></div>' +
+      '<div class="eu-country-stat"><span class="eu-country-stat-label">PR path</span><span class="eu-country-stat-value">' + esc(co.pr_years) + '</span></div>' +
+
+      '<div class="eu-country-why">' + esc(co.note) + '</div>' +
     '</div>';
   }).join('');
 }
 
 function filterEuropeCompanies(filter, btn) {
-  europeCompanyFilter = filter;
-  document.querySelectorAll('#europe-sec-companies .chip').forEach(function(c) { c.classList.remove('active'); });
-  if (btn) btn.classList.add('active');
+  var isCountry = ['NL', 'DE', 'SE', 'IE', 'FI', 'CH', 'BE', 'DK'].indexOf(filter) !== -1;
+  var key = isCountry ? 'country' : 'tier';
+  // toggle off if same filter clicked
+  europeCompanyFilters[key] = (europeCompanyFilters[key] === filter) ? 'ALL' : filter;
+  // ALL only meaningful as tier reset
+  if (filter === 'ALL') europeCompanyFilters.tier = 'ALL';
+
+  // visual: only ONE active per group
+  var group = btn ? btn.parentElement : null;
+  if (group) {
+    group.querySelectorAll('.eu-filter').forEach(function(b) { b.classList.remove('active'); });
+    if (europeCompanyFilters[key] !== 'ALL') btn.classList.add('active');
+    else if (filter === 'ALL') btn.classList.add('active');
+  }
   renderEuropeCompanies();
 }
 
 function renderEuropeCompanies() {
   var list = document.getElementById('europe-companies-list');
   var counter = document.getElementById('europe-company-count');
+  var pipeline = document.getElementById('eu-pipeline');
   if (!list || !europeRef) return;
-  var companies = europeRef.companies.filter(function(co) {
-    if (europeCompanyFilter === 'ALL') return true;
-    if (['1', '2', '3'].indexOf(europeCompanyFilter) !== -1) return String(co.tier) === europeCompanyFilter;
-    return co.country === europeCompanyFilter;
-  });
-  if (counter) counter.textContent = '(' + companies.length + ')';
-  if (companies.length === 0) { list.innerHTML = '<p style="color:#71717a;text-align:center;padding:20px">No companies match this filter.</p>'; return; }
 
-  // Group by tier
+  var companies = europeRef.companies.filter(function(co) {
+    if (europeCompanyFilters.tier !== 'ALL' && String(co.tier) !== europeCompanyFilters.tier) return false;
+    if (europeCompanyFilters.country !== 'ALL' && co.country !== europeCompanyFilters.country) return false;
+    return true;
+  });
+  if (counter) counter.textContent = '· ' + companies.length + ' shown';
+
+  // Pipeline counts (across ALL companies, not filtered)
+  var stages = { NOT_STARTED: 0, RESEARCHING: 0, APPLIED: 0, SCREENING: 0, INTERVIEW: 0, OFFER: 0 };
+  europeRef.companies.forEach(function(co) {
+    var p = europeProgress['company:' + co.key];
+    var s = (p && p.status) || 'NOT_STARTED';
+    if (stages[s] !== undefined) stages[s]++;
+  });
+  var pipeOrder = [
+    { k: 'NOT_STARTED', label: 'Not started' },
+    { k: 'RESEARCHING', label: 'Researching' },
+    { k: 'APPLIED', label: 'Applied' },
+    { k: 'SCREENING', label: 'Screening' },
+    { k: 'INTERVIEW', label: 'Interview' },
+    { k: 'OFFER', label: 'Offer' }
+  ];
+  if (pipeline) {
+    pipeline.innerHTML = pipeOrder.map(function(s) {
+      return '<div class="eu-pipeline-cell pipe-' + s.k + '">' +
+        '<div class="eu-pipeline-num">' + stages[s.k] + '</div>' +
+        '<div class="eu-pipeline-stage">' + s.label + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  if (companies.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:40px;color:#71717a;background:rgba(24,24,27,.4);border-radius:14px"><div style="font-size:32px;margin-bottom:8px">🔍</div><p>No companies match these filters</p></div>';
+    return;
+  }
+
   var grouped = { 1: [], 2: [], 3: [] };
   companies.forEach(function(co) { grouped[co.tier].push(co); });
-  var tierLabels = { 1: '⭐ Tier 1 — Apply Immediately', 2: 'Tier 2 — After 2 Months Prep', 3: 'Tier 3 — Indian-Arm → Europe Transfer (12-24 months)' };
+  var tierMeta = {
+    1: { title: 'Tier 1 — Apply immediately', desc: 'Best probability for your profile', cls: 'eu-tier-1' },
+    2: { title: 'Tier 2 — After 2 months prep', desc: 'Once skill gaps are closed', cls: 'eu-tier-2' },
+    3: { title: 'Tier 3 — Indian-arm transfer (12-24 months)', desc: 'Zero-unemployment-risk path', cls: 'eu-tier-3' }
+  };
 
   list.innerHTML = [1, 2, 3].filter(function(t) { return grouped[t].length > 0; }).map(function(tier) {
-    return '<div style="margin-bottom:18px"><h3 style="font-size:14px;font-weight:700;color:#c4b5fd;margin-bottom:10px">' + tierLabels[tier] + '</h3>' +
-      grouped[tier].map(europeCompanyCardHTML).join('') +
+    var m = tierMeta[tier];
+    return '<div class="eu-tier-section">' +
+      '<div class="eu-tier-header">' +
+        '<span class="eu-tier-badge ' + m.cls + '">TIER ' + tier + '</span>' +
+        '<div><div class="eu-tier-title">' + esc(m.title) + '</div><div class="eu-tier-desc">' + esc(m.desc) + '</div></div>' +
+      '</div>' +
+      '<div class="eu-co-grid">' + grouped[tier].map(europeCompanyCardHTML).join('') + '</div>' +
     '</div>';
   }).join('');
 }
@@ -2506,101 +2587,127 @@ function renderEuropeCompanies() {
 function europeCompanyCardHTML(co) {
   var country = (europeRef.countries.find(function(c) { return c.code === co.country; }) || {});
   var prog = europeProgress['company:' + co.key] || { status: 'NOT_STARTED', notes: '' };
-  var stars = '';
-  for (var i = 0; i < co.fit; i++) stars += '★';
-  for (var j = co.fit; j < 5; j++) stars += '☆';
   var statusOptions = ['NOT_STARTED', 'RESEARCHING', 'APPLIED', 'SCREENING', 'INTERVIEW', 'OFFER', 'REJECTED'];
   var statusColor = prog.status === 'OFFER' ? '#bef264' :
                     prog.status === 'INTERVIEW' ? '#86efac' :
                     prog.status === 'APPLIED' || prog.status === 'SCREENING' ? '#a5b4fc' :
                     prog.status === 'REJECTED' ? '#fca5a5' :
                     prog.status === 'RESEARCHING' ? '#fcd34d' : '#a1a1aa';
-  return '<div class="europe-company-card">' +
-    '<div class="ec-top">' +
-      '<div>' +
-        '<span class="tier-badge-' + co.tier + '">Tier ' + co.tier + '</span> ' +
-        '<span class="ec-name">' + esc(co.name) + '</span>' +
-        '<div class="ec-meta">' + (country.flag || '') + ' ' + esc(co.city) + ' · <span class="fit-stars">' + stars + '</span> fit</div>' +
-      '</div>' +
-      '<select onchange="updateEuropeProgress(\'company\',\'' + esc(co.key) + '\',this.value)" style="background:rgba(9,9,11,.8);border:1px solid rgba(63,63,70,.5);border-radius:8px;color:' + statusColor + ';padding:6px 10px;font-size:12px;font-weight:600;font-family:inherit">' +
-        statusOptions.map(function(s) { return '<option value="' + s + '"' + (prog.status === s ? ' selected' : '') + '>' + s.replace('_', ' ') + '</option>'; }).join('') +
-      '</select>' +
+  var fitDots = '';
+  for (var i = 1; i <= 5; i++) fitDots += '<span' + (i <= co.fit ? ' class="on"' : '') + '></span>';
+
+  return '<div class="eu-co-card s-' + prog.status + '">' +
+    (prog.status !== 'NOT_STARTED' ? '<div class="eu-co-status-bar s-' + prog.status + '"></div>' : '') +
+    '<div class="eu-co-head">' +
+      '<div style="flex:1"><div class="eu-co-name">' + esc(co.name) + '</div>' +
+      '<div class="eu-co-meta">' + (country.flag || '') + ' ' + esc(co.city) + '</div></div>' +
+      '<div class="eu-fit-row" title="Stack fit ' + co.fit + '/5">' + fitDots + '</div>' +
     '</div>' +
-    '<div class="ec-stack">' + esc(co.stack) + '</div>' +
-    '<div class="ec-note">' + esc(co.note) + '</div>' +
+    '<div class="eu-co-stack">' + esc(co.stack) + '</div>' +
+    '<div class="eu-co-note">' + esc(co.note) + '</div>' +
+    '<select class="eu-co-select" style="color:' + statusColor + '" onchange="updateEuropeProgress(\'company\',\'' + esc(co.key) + '\',this.value)">' +
+      statusOptions.map(function(s) { return '<option value="' + s + '"' + (prog.status === s ? ' selected' : '') + '>' + s.replace(/_/g, ' ') + '</option>'; }).join('') +
+    '</select>' +
   '</div>';
 }
 
 function renderEuropeSkills() {
-  var list = document.getElementById('europe-skills-list');
-  if (!list || !europeRef) return;
+  var lanes = document.getElementById('europe-skill-lanes');
+  if (!lanes || !europeRef) return;
   var total = europeRef.skills.length;
   var done = europeRef.skills.filter(function(sk) {
-    var p = europeProgress['skill:' + sk.key];
-    return p && p.status === 'DONE';
+    var p = europeProgress['skill:' + sk.key]; return p && p.status === 'DONE';
   }).length;
   var pct = total ? Math.round(done / total * 100) : 0;
-  document.getElementById('europe-skill-progress-label').textContent = done + ' / ' + total + ' skills mastered (' + pct + '%)';
+  document.getElementById('europe-skill-progress-label').textContent = done + ' of ' + total + ' mastered · ' + pct + '%';
   document.getElementById('europe-skill-progress-fill').style.width = pct + '%';
 
-  var grouped = {};
-  europeRef.skills.forEach(function(sk) { if (!grouped[sk.category]) grouped[sk.category] = []; grouped[sk.category].push(sk); });
-  var order = ['Critical Gap', 'Important', 'Bonus'];
-  list.innerHTML = order.filter(function(c) { return grouped[c]; }).map(function(cat) {
-    return '<div style="margin-bottom:14px"><h3 style="font-size:13px;font-weight:700;color:#c4b5fd;margin-bottom:8px">' + cat + '</h3>' +
-      grouped[cat].map(europeSkillCardHTML).join('') +
+  var priorities = ['CRITICAL', 'IMPORTANT', 'BONUS'];
+  var priorityMeta = {
+    CRITICAL: { title: 'Critical gaps', sub: 'Block interviews' },
+    IMPORTANT: { title: 'Important', sub: 'Expected at mid-level' },
+    BONUS: { title: 'Bonus', sub: 'Tiebreakers vs other candidates' }
+  };
+  lanes.innerHTML = priorities.map(function(pri) {
+    var skillsInLane = europeRef.skills.filter(function(s) { return s.priority === pri; });
+    var doneInLane = skillsInLane.filter(function(s) { var p = europeProgress['skill:' + s.key]; return p && p.status === 'DONE'; }).length;
+    var m = priorityMeta[pri];
+    return '<div class="eu-skill-lane lane-' + pri + '">' +
+      '<div class="eu-skill-lane-head">' +
+        '<span class="eu-skill-dot dot-' + pri + '"></span>' +
+        '<div><div class="eu-skill-lane-title">' + esc(m.title) + '</div>' +
+        '<div style="font-size:10px;color:#71717a">' + esc(m.sub) + '</div></div>' +
+        '<span class="eu-skill-lane-count">' + doneInLane + '/' + skillsInLane.length + '</span>' +
+      '</div>' +
+      skillsInLane.map(europeSkillItemHTML).join('') +
     '</div>';
   }).join('');
 }
 
-function europeSkillCardHTML(sk) {
+function europeSkillItemHTML(sk) {
   var prog = europeProgress['skill:' + sk.key] || { status: 'TODO', notes: '' };
+  var stateClass = prog.status === 'DONE' ? 'done' : prog.status === 'IN_PROGRESS' ? 'in-progress' : '';
+  var checkIcon = prog.status === 'DONE' ? '✓' : prog.status === 'IN_PROGRESS' ? '◐' : '';
   var next = prog.status === 'TODO' ? 'IN_PROGRESS' : prog.status === 'IN_PROGRESS' ? 'DONE' : 'TODO';
-  var statusBadge = prog.status === 'DONE' ? 'badge-DONE' : prog.status === 'IN_PROGRESS' ? 'badge-REVIEW' : 'badge-TODO';
-  return '<div class="europe-skill-card skill-pri-' + sk.priority + '">' +
-    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">' +
-      '<div style="flex:1;min-width:200px">' +
-        '<div style="font-size:14px;font-weight:700;margin-bottom:4px">' + esc(sk.skill) + '</div>' +
-        '<div style="font-size:12px;color:#a1a1aa;margin-bottom:6px">' + esc(sk.target) + '</div>' +
-        (sk.resource ? '<a href="' + esc(sk.resource) + '" target="_blank" style="font-size:11px;color:#818cf8">📖 Resource →</a>' : '') +
-      '</div>' +
-      '<span class="badge ' + statusBadge + '" onclick="updateEuropeProgress(\'skill\',\'' + esc(sk.key) + '\',\'' + next + '\')" style="cursor:pointer">' + esc(prog.status.replace('_', ' ')) + '</span>' +
+  return '<div class="eu-skill-item ' + stateClass + '" onclick="updateEuropeProgress(\'skill\',\'' + esc(sk.key) + '\',\'' + next + '\')">' +
+    '<div class="eu-skill-item-head">' +
+      '<div class="eu-skill-name">' + esc(sk.skill) + '</div>' +
+      '<div class="eu-skill-check">' + checkIcon + '</div>' +
     '</div>' +
+    '<div class="eu-skill-target">' + esc(sk.target) + '</div>' +
+    (sk.resource ? '<a class="eu-skill-link" href="' + esc(sk.resource) + '" target="_blank" onclick="event.stopPropagation()">📖 Open resource →</a>' : '') +
   '</div>';
 }
 
 function renderEuropePlan() {
-  var list = document.getElementById('europe-plan-list');
-  if (!list || !europeRef) return;
+  var timeline = document.getElementById('europe-plan-timeline');
+  if (!timeline || !europeRef) return;
   var total = europeRef.prepPlan.length;
   var done = europeRef.prepPlan.filter(function(t) {
-    var p = europeProgress['task:' + t.key];
-    return p && p.status === 'DONE';
+    var p = europeProgress['task:' + t.key]; return p && p.status === 'DONE';
   }).length;
   var pct = total ? Math.round(done / total * 100) : 0;
-  document.getElementById('europe-plan-progress-label').textContent = done + ' / ' + total + ' tasks done (' + pct + '%)';
+  document.getElementById('europe-plan-progress-label').textContent = done + ' of ' + total + ' tasks · ' + pct + '%';
   document.getElementById('europe-plan-progress-fill').style.width = pct + '%';
 
+  // Determine current month: first month not fully done
   var byMonth = {};
   europeRef.prepPlan.forEach(function(t) { if (!byMonth[t.month]) byMonth[t.month] = []; byMonth[t.month].push(t); });
-  list.innerHTML = Object.keys(byMonth).sort(function(a, b) { return Number(a) - Number(b); }).map(function(m) {
-    return '<div class="europe-month-header">Month ' + m + '</div>' +
-      byMonth[m].map(europeTaskCardHTML).join('');
+  var months = Object.keys(byMonth).sort(function(a, b) { return Number(a) - Number(b); });
+  var currentMonth = null;
+  for (var i = 0; i < months.length; i++) {
+    var allDone = byMonth[months[i]].every(function(t) { var p = europeProgress['task:' + t.key]; return p && p.status === 'DONE'; });
+    if (!allDone) { currentMonth = months[i]; break; }
+  }
+  if (!currentMonth && months.length) currentMonth = months[0];
+
+  timeline.innerHTML = months.map(function(m) {
+    var tasks = byMonth[m];
+    var monthDone = tasks.filter(function(t) { var p = europeProgress['task:' + t.key]; return p && p.status === 'DONE'; }).length;
+    var allDone = monthDone === tasks.length;
+    var isCurrent = String(m) === String(currentMonth) && !allDone;
+    var stateCls = allDone ? 'done' : (isCurrent ? 'current' : '');
+    return '<div class="eu-month ' + stateCls + '">' +
+      '<span class="eu-month-num">' + (allDone ? '✓' : m) + '</span>' +
+      '<div class="eu-month-header">' +
+        '<div class="eu-month-title">Month ' + m + '</div>' +
+        (isCurrent ? '<span class="eu-month-current-pill">CURRENT</span>' : '') +
+        '<div class="eu-month-stats">' + monthDone + '/' + tasks.length + ' done</div>' +
+      '</div>' +
+      tasks.map(europeTaskItemHTML).join('') +
+    '</div>';
   }).join('');
 }
 
-function europeTaskCardHTML(t) {
+function europeTaskItemHTML(t) {
   var prog = europeProgress['task:' + t.key] || { status: 'TODO', notes: '' };
+  var stateClass = prog.status === 'DONE' ? 'done' : prog.status === 'IN_PROGRESS' ? 'in-progress' : '';
+  var checkIcon = prog.status === 'DONE' ? '✓' : prog.status === 'IN_PROGRESS' ? '◐' : '';
   var next = prog.status === 'TODO' ? 'IN_PROGRESS' : prog.status === 'IN_PROGRESS' ? 'DONE' : 'TODO';
-  var statusBadge = prog.status === 'DONE' ? 'badge-DONE' : prog.status === 'IN_PROGRESS' ? 'badge-REVIEW' : 'badge-TODO';
-  return '<div class="europe-task-card">' +
-    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">' +
-      '<div style="flex:1;min-width:200px">' +
-        '<div style="font-size:13px;color:#fafafa;margin-bottom:4px">' + esc(t.task) + '</div>' +
-        '<div style="font-size:11px;color:#71717a">⏱️ ~' + t.hours + ' hrs/week</div>' +
-      '</div>' +
-      '<span class="badge ' + statusBadge + '" onclick="updateEuropeProgress(\'task\',\'' + esc(t.key) + '\',\'' + next + '\')" style="cursor:pointer">' + esc(prog.status.replace('_', ' ')) + '</span>' +
-    '</div>' +
+  return '<div class="eu-task ' + stateClass + '" onclick="updateEuropeProgress(\'task\',\'' + esc(t.key) + '\',\'' + next + '\')">' +
+    '<div class="eu-task-check">' + checkIcon + '</div>' +
+    '<div class="eu-task-text">' + esc(t.task) + '</div>' +
+    '<div class="eu-task-hours">~' + t.hours + ' hrs/wk</div>' +
   '</div>';
 }
 
@@ -2611,25 +2718,53 @@ async function updateEuropeProgress(item_type, item_key, status) {
     if (item_type === 'company') renderEuropeCompanies();
     if (item_type === 'skill') renderEuropeSkills();
     if (item_type === 'task') renderEuropePlan();
-    toast('Updated');
+    renderEuropeKPIs();
   } catch (e) { toast('Failed to save', true); }
 }
 
-async function calcEuropeSalary() {
+function setSalaryPreset(amount) {
+  document.getElementById('europe-sal-gross').value = amount;
+  calcEuropeSalaryAll();
+}
+
+var EU_SAL_COUNTRIES = [
+  { code: 'NL', name: 'Netherlands', flag: '🇳🇱', city: 'Amsterdam' },
+  { code: 'DE', name: 'Germany', flag: '🇩🇪', city: 'Berlin/Munich' },
+  { code: 'SE', name: 'Sweden', flag: '🇸🇪', city: 'Stockholm' },
+  { code: 'IE', name: 'Ireland', flag: '🇮🇪', city: 'Dublin' },
+  { code: 'FI', name: 'Finland', flag: '🇫🇮', city: 'Helsinki' },
+  { code: 'CH', name: 'Switzerland', flag: '🇨🇭', city: 'Zurich' }
+];
+
+async function calcEuropeSalaryAll() {
   var gross = parseFloat(document.getElementById('europe-sal-gross').value) || 0;
-  var country = document.getElementById('europe-sal-country').value;
-  if (gross < 20000) return toast('Enter a valid gross salary', true);
+  var grid = document.getElementById('europe-salary-grid');
+  if (!grid) return;
+  if (gross < 20000) { grid.innerHTML = '<p style="color:#fca5a5;padding:20px;text-align:center">Enter a valid gross salary (€20,000+)</p>'; return; }
+
   try {
-    var r = await api('/api/europe/salary-calc?gross=' + gross + '&country=' + country + '&under30=true');
-    var rate = (r.effective_tax_rate * 100).toFixed(1);
-    var netMonthly = r.net_monthly.toLocaleString();
-    var netAnnual = r.net_annual.toLocaleString();
-    document.getElementById('europe-sal-result').innerHTML =
-      '<div class="stats-grid">' +
-        '<div class="stat-card"><div class="num" style="color:#bef264">€' + netMonthly + '</div><div class="label">Net Monthly</div></div>' +
-        '<div class="stat-card"><div class="num" style="color:#a5b4fc">€' + netAnnual + '</div><div class="label">Net Annual</div></div>' +
-        '<div class="stat-card"><div class="num" style="color:#fcd34d">' + r.effective_tax_rate + '%</div><div class="label">Effective Tax</div></div>' +
-      '</div>' +
-      '<p style="font-size:12px;color:#a1a1aa;margin-top:10px">' + esc(r.note) + '</p>';
+    var results = await Promise.all(EU_SAL_COUNTRIES.map(function(c) {
+      return api('/api/europe/salary-calc?gross=' + gross + '&country=' + c.code + '&under30=true')
+        .then(function(r) { return Object.assign({}, c, r); });
+    }));
+    // Sort by net annual desc to find the best
+    var sorted = results.slice().sort(function(a, b) { return b.net_annual - a.net_annual; });
+    var bestCode = sorted[0].code;
+
+    grid.innerHTML = results.map(function(r) {
+      var isBest = r.code === bestCode;
+      return '<div class="eu-sal-card' + (isBest ? ' best' : '') + '">' +
+        (isBest ? '<div class="eu-sal-best-badge">💰 BEST NET</div>' : '') +
+        '<div class="eu-sal-flag">' + r.flag + '</div>' +
+        '<div class="eu-sal-country">' + esc(r.name) + ' · ' + esc(r.city) + '</div>' +
+        '<div class="eu-sal-net">€' + r.net_monthly.toLocaleString() + '</div>' +
+        '<div class="eu-sal-net-label">Net / month</div>' +
+        '<div style="margin-top:14px">' +
+          '<div class="eu-sal-detail"><span>Net annual</span><span>€' + r.net_annual.toLocaleString() + '</span></div>' +
+          '<div class="eu-sal-detail"><span>Effective tax</span><span>' + r.effective_tax_rate + '%</span></div>' +
+        '</div>' +
+        '<div class="eu-sal-note">' + esc(r.note) + '</div>' +
+      '</div>';
+    }).join('');
   } catch (e) { toast('Calc failed', true); }
 }
