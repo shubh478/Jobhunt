@@ -239,6 +239,36 @@
   .ah-cover-box { background: rgba(15,15,17,.6); padding: 10px; border-radius: 8px; font-size: 11px; color: #d4d4d8; max-height: 200px; overflow-y: auto; line-height: 1.5; white-space: pre-wrap; border: 1px solid rgba(63,63,70,.4); }
   .ah-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 
+  /* Europe Plan styling */
+  .europe-anchor { background:rgba(24,24,27,.5); border:1px solid rgba(63,63,70,.4); border-radius:10px; padding:10px 14px; font-size:12px; }
+  .europe-anchor.danger { border-color:rgba(239,68,68,.4); background:rgba(239,68,68,.08); }
+  .europe-anchor .ea-label { color:#71717a; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600; }
+  .europe-anchor .ea-value { color:#fafafa; font-weight:700; font-size:14px; margin-top:2px; }
+  .europe-anchor.danger .ea-value { color:#fca5a5; }
+  .country-note-card { background:rgba(24,24,27,.5); border:1px solid rgba(63,63,70,.4); border-radius:12px; padding:14px; }
+  .country-note-card h4 { font-size:13px; margin-bottom:6px; }
+  .country-note-card p { font-size:12px; color:#a1a1aa; line-height:1.5; }
+  .europe-company-card { background:rgba(24,24,27,.5); border:1px solid rgba(63,63,70,.4); border-radius:12px; padding:14px; margin-bottom:10px; }
+  .europe-company-card:hover { border-color:rgba(129,140,248,.3); }
+  .europe-company-card .ec-top { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap; }
+  .europe-company-card .ec-name { font-size:15px; font-weight:700; }
+  .europe-company-card .ec-meta { font-size:11px; color:#71717a; margin-top:3px; }
+  .europe-company-card .ec-stack { font-size:12px; color:#a5b4fc; margin-top:6px; font-family:'SF Mono',Menlo,monospace; }
+  .europe-company-card .ec-note { font-size:12px; color:#d4d4d8; margin-top:6px; line-height:1.5; }
+  .europe-company-card .ec-actions { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
+  .tier-badge-1 { background:linear-gradient(135deg,#f59e0b,#fbbf24); color:#1a1a00; padding:3px 10px; border-radius:9999px; font-size:10px; font-weight:800; }
+  .tier-badge-2 { background:rgba(129,140,248,.2); color:#a5b4fc; padding:3px 10px; border-radius:9999px; font-size:10px; font-weight:700; }
+  .tier-badge-3 { background:rgba(34,197,94,.15); color:#86efac; padding:3px 10px; border-radius:9999px; font-size:10px; font-weight:700; }
+  .fit-stars { color:#fbbf24; font-size:11px; letter-spacing:1px; }
+  .europe-skill-card, .europe-task-card { background:rgba(24,24,27,.5); border:1px solid rgba(63,63,70,.4); border-radius:12px; padding:14px; margin-bottom:10px; }
+  .skill-pri-CRITICAL { border-left:3px solid #ef4444; }
+  .skill-pri-IMPORTANT { border-left:3px solid #f59e0b; }
+  .skill-pri-BONUS { border-left:3px solid #22c55e; }
+  .europe-month-header { font-size:15px; font-weight:700; color:#c4b5fd; margin:14px 0 8px; padding-bottom:6px; border-bottom:1px solid rgba(129,140,248,.2); }
+  .progress-label { font-size:12px; color:#71717a; margin-bottom:6px; }
+  .progress-bar { width:100%; height:6px; background:rgba(63,63,70,.4); border-radius:9999px; overflow:hidden; }
+  .progress-fill { height:100%; background:linear-gradient(90deg,#6366f1,#a855f7); transition:width .4s ease; }
+
   @media (max-width: 768px) {
     .apply-helper { width: 100%; }
   }
@@ -261,6 +291,7 @@
   <button class="nav-btn" onclick="switchTab('applications')">Applications</button>
   <button class="nav-btn" onclick="switchTab('quickapply')">Quick Apply</button>
   <button class="nav-btn" onclick="switchTab('prep')">Prep</button>
+  <button class="nav-btn" onclick="switchTab('europe')" style="background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(168,85,247,.08));border-radius:8px 8px 0 0">🇪🇺 Europe Plan</button>
   <button class="nav-btn" onclick="switchTab('study')">Study Materials</button>
   <button class="nav-btn" onclick="switchTab('resources')">Resources</button>
   <button class="nav-btn" onclick="switchTab('settings')">Settings</button>
@@ -557,6 +588,113 @@
     <div class="progress-label" id="prep-progress-label"></div>
     <div class="progress-bar"><div class="progress-fill" id="prep-progress-fill"></div></div>
     <div id="prep-list"></div>
+  </div>
+
+  <!-- ==================== EUROPE JOB PREP ==================== -->
+  <div id="tab-europe" class="tab">
+    <div style="background:linear-gradient(135deg,rgba(99,102,241,.12),rgba(168,85,247,.08));border:1px solid rgba(129,140,248,.25);border-radius:16px;padding:20px;margin-bottom:18px">
+      <h2 style="font-size:22px;font-weight:800;background:linear-gradient(135deg,#818cf8,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px">🇪🇺 Europe Software Job Plan</h2>
+      <p style="font-size:13px;color:#a1a1aa">Country comparison, target companies, skill gap tracker, 6-month prep plan, and salary calculator — tailored for an Indian Java/Spring dev with 2 YOE.</p>
+      <div id="europe-anchors" style="display:flex;gap:14px;flex-wrap:wrap;margin-top:14px"></div>
+    </div>
+
+    <!-- Sub-nav for sections -->
+    <div class="filters" style="margin-bottom:18px">
+      <button class="chip active" onclick="switchEuropeSection('overview', this)">🌍 Countries</button>
+      <button class="chip" onclick="switchEuropeSection('companies', this)">🏢 Target Companies</button>
+      <button class="chip" onclick="switchEuropeSection('skills', this)">🎯 Skill Gap</button>
+      <button class="chip" onclick="switchEuropeSection('plan', this)">📋 6-Month Plan</button>
+      <button class="chip" onclick="switchEuropeSection('salary', this)">💶 Salary Calc</button>
+    </div>
+
+    <!-- === Section: Countries Overview === -->
+    <div id="europe-sec-overview" class="europe-sec">
+      <div class="section-header"><h2>Country Comparison Matrix</h2><span style="font-size:12px;color:#71717a">Ranked for your profile (2 YOE Java, under 30)</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>#</th><th>Country</th><th>Visa</th><th>Salary threshold</th><th>Processing</th><th>Firing protection</th><th>English jobs</th><th>PR path</th><th>Tax benefit</th>
+          </tr></thead>
+          <tbody id="europe-countries-tbody"></tbody>
+        </table>
+      </div>
+      <div id="europe-country-notes" style="margin-top:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px"></div>
+    </div>
+
+    <!-- === Section: Target Companies === -->
+    <div id="europe-sec-companies" class="europe-sec" style="display:none">
+      <div class="section-header">
+        <h2>Target Companies <span id="europe-company-count" style="font-size:12px;color:#71717a;font-weight:400"></span></h2>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="chip active" onclick="filterEuropeCompanies('ALL', this)">All</button>
+          <button class="chip" onclick="filterEuropeCompanies('1', this)">⭐ Tier 1</button>
+          <button class="chip" onclick="filterEuropeCompanies('2', this)">Tier 2</button>
+          <button class="chip" onclick="filterEuropeCompanies('3', this)">Tier 3 (Transfer)</button>
+          <button class="chip" onclick="filterEuropeCompanies('NL', this)">🇳🇱 NL</button>
+          <button class="chip" onclick="filterEuropeCompanies('DE', this)">🇩🇪 DE</button>
+          <button class="chip" onclick="filterEuropeCompanies('SE', this)">🇸🇪 SE</button>
+          <button class="chip" onclick="filterEuropeCompanies('IE', this)">🇮🇪 IE</button>
+        </div>
+      </div>
+      <div id="europe-companies-list"></div>
+    </div>
+
+    <!-- === Section: Skill Gap Tracker === -->
+    <div id="europe-sec-skills" class="europe-sec" style="display:none">
+      <div class="section-header"><h2>Skill Gap — what you need to build before applying</h2></div>
+      <div class="progress-label" id="europe-skill-progress-label"></div>
+      <div class="progress-bar"><div class="progress-fill" id="europe-skill-progress-fill"></div></div>
+      <div id="europe-skills-list" style="margin-top:14px"></div>
+    </div>
+
+    <!-- === Section: 6-Month Prep Plan === -->
+    <div id="europe-sec-plan" class="europe-sec" style="display:none">
+      <div class="section-header"><h2>6-Month Preparation Plan (10 hrs/week)</h2></div>
+      <div class="progress-label" id="europe-plan-progress-label"></div>
+      <div class="progress-bar"><div class="progress-fill" id="europe-plan-progress-fill"></div></div>
+      <div id="europe-plan-list" style="margin-top:14px"></div>
+    </div>
+
+    <!-- === Section: Salary Calculator === -->
+    <div id="europe-sec-salary" class="europe-sec" style="display:none">
+      <div class="section-header"><h2>Salary Take-Home Calculator</h2></div>
+      <div class="settings-section">
+        <p style="font-size:12px;color:#71717a;margin-bottom:14px">Quick directional estimate of monthly net pay. Netherlands 30% ruling, Finland foreign-expert tax, etc. all factored. Use for negotiation floor reference only — not tax advice.</p>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Gross Annual Salary (EUR or local)</label>
+            <input type="number" id="europe-sal-gross" value="65000" min="20000" max="300000">
+          </div>
+          <div class="form-group">
+            <label>Country</label>
+            <select id="europe-sal-country">
+              <option value="NL">🇳🇱 Netherlands (with 30% ruling)</option>
+              <option value="DE">🇩🇪 Germany</option>
+              <option value="SE">🇸🇪 Sweden</option>
+              <option value="IE">🇮🇪 Ireland</option>
+              <option value="FI">🇫🇮 Finland</option>
+              <option value="CH">🇨🇭 Switzerland</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="calcEuropeSalary()">Calculate</button>
+        <div id="europe-sal-result" style="margin-top:18px"></div>
+      </div>
+
+      <div class="settings-section" style="margin-top:14px">
+        <h3>Negotiation Floor (Don't Accept Below)</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Country / City</th><th>2-YOE Java floor (base)</th><th>Top tier offer</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>🇳🇱 Amsterdam</td><td>€55,000</td><td>€68–80k (Booking/Adyen)</td><td>+ 30% ruling = ~€4,100/mo net on €65k</td></tr>
+            <tr><td>🇩🇪 Berlin</td><td>€58,000</td><td>€72–90k (Celonis/N26)</td><td>~€3,600/mo net on €65k</td></tr>
+            <tr><td>🇩🇪 Munich</td><td>€62,000</td><td>€80–95k (Celonis/Personio)</td><td>Higher COL but higher base</td></tr>
+            <tr><td>🇮🇪 Dublin</td><td>€52,000</td><td>€70–90k (Stripe/Workday)</td><td>SARP if eligible</td></tr>
+            <tr><td>🇸🇪 Stockholm</td><td>SEK 580,000</td><td>SEK 750k+ (Spotify/Klarna)</td><td>~50% effective tax</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </div>
   </div>
 
   <!-- ==================== STUDY MATERIALS ==================== -->

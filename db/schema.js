@@ -144,6 +144,22 @@ async function initDB() {
     )
   `);
 
+  // Europe Job Prep — per-user status tracking on a generic key-value table.
+  // item_type ∈ {company, skill, task}; item_key is the stable id from frontend reference data.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS europe_progress (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      item_type TEXT NOT NULL,
+      item_key TEXT NOT NULL,
+      status TEXT DEFAULT 'TODO',
+      notes TEXT DEFAULT '',
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE (user_id, item_type, item_key)
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS europe_progress_user_idx ON europe_progress(user_id)`);
+
   // Phase 1a/1b: per-user data isolation
   const userScopedTables = [
     'applications', 'profile', 'prep_topics', 'daily_log',

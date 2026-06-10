@@ -46,6 +46,7 @@ app.use('/api', require('./routes/automation'));
 app.use('/api', require('./routes/stats'));
 app.use('/api', require('./routes/prep'));
 app.use('/api', require('./routes/ai'));
+app.use('/api', require('./routes/europe'));
 
 // Serve frontend — redirect to /login.html if not logged in
 app.get('/', (req, res) => {
