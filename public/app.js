@@ -2487,7 +2487,8 @@ function renderEuropeCountries() {
     }
     meterHtml += '</span>';
 
-    return '<div class="eu-country-card ' + rankClass + '">' +
+    var hasPlan = europeRef.countryPlans && europeRef.countryPlans[co.code];
+    return '<div class="eu-country-card ' + rankClass + '"' + (hasPlan ? ' onclick="openCountryPlan(\'' + esc(co.code) + '\')"' : '') + '>' +
       '<div class="eu-country-rank ' + rankBadgeClass + '">' + rankLabel + '</div>' +
       '<div class="eu-country-flag">' + co.flag + '</div>' +
       '<div class="eu-country-name">' + esc(co.name) + '</div>' +
@@ -2500,9 +2501,127 @@ function renderEuropeCountries() {
       '<div class="eu-country-stat"><span class="eu-country-stat-label">PR path</span><span class="eu-country-stat-value">' + esc(co.pr_years) + '</span></div>' +
 
       '<div class="eu-country-why">' + esc(co.note) + '</div>' +
+      (hasPlan ? '<div class="eu-country-cta"><span>View full plan</span><span>Job · PhD · PhD+Job →</span></div>' : '') +
     '</div>';
   }).join('');
 }
+
+function openCountryPlan(code) {
+  if (!europeRef || !europeRef.countryPlans || !europeRef.countryPlans[code]) return;
+  var plan = europeRef.countryPlans[code];
+
+  // Hero
+  document.getElementById('eu-country-modal-hero').innerHTML =
+    '<div class="eu-modal-flag">' + plan.flag + '</div>' +
+    '<div class="eu-modal-title">' + esc(plan.name) + '</div>' +
+    '<div class="eu-modal-subtitle">' + esc(plan.intro) + '</div>';
+
+  // Tabs
+  var tabsEl = document.getElementById('eu-country-modal-tabs');
+  tabsEl.innerHTML = plan.paths.map(function(p, idx) {
+    var agePill = p.age === 'under30' ? '<span class="age-pill">Under 30</span>' :
+                  p.age === 'post30' ? '<span class="age-pill">Post 30</span>' : '';
+    return '<button class="eu-path-tab' + (idx === 0 ? ' active' : '') + '" onclick="switchEuropePath(\'' + esc(p.id) + '\', this)">' +
+      '<span>' + p.icon + '</span> ' + esc(p.title) + ' ' + agePill +
+    '</button>';
+  }).join('');
+
+  // Body sections
+  var body = document.getElementById('eu-country-modal-body');
+  body.innerHTML = plan.paths.map(function(p, idx) {
+    return '<div class="eu-path-section' + (idx === 0 ? ' active' : '') + '" data-path-id="' + esc(p.id) + '">' +
+      '<div class="eu-path-summary">' + esc(p.summary) + '</div>' +
+      '<div class="eu-path-grid">' +
+        '<div class="eu-path-stat"><div class="eu-path-stat-label">Threshold</div><div class="eu-path-stat-value">' + esc(p.threshold) + '</div></div>' +
+        '<div class="eu-path-stat"><div class="eu-path-stat-label">Timeline</div><div class="eu-path-stat-value">' + esc(p.timeline) + '</div></div>' +
+        '<div class="eu-path-stat"><div class="eu-path-stat-label">Salary</div><div class="eu-path-stat-value">' + esc(p.salary) + '</div></div>' +
+        '<div class="eu-path-stat"><div class="eu-path-stat-label">Type</div><div class="eu-path-stat-value">' + esc(p.kind === 'job' ? 'Direct employment' : p.kind === 'phd' ? 'Funded research position' : 'Hybrid path') + '</div></div>' +
+      '</div>' +
+      '<div class="eu-path-steps">' +
+        '<div class="eu-path-steps-title">📋 Step by step</div>' +
+        p.steps.map(function(s, i) {
+          return '<div class="eu-path-step"><span class="eu-path-step-num">' + (i + 1) + '</span><span>' + esc(s) + '</span></div>';
+        }).join('') +
+      '</div>' +
+      '<div class="eu-path-steps">' +
+        '<div class="eu-path-steps-title">🎯 Targets (' + (p.kind === 'phd' ? 'universities' : p.kind === 'combined' ? 'post-PhD employers' : 'companies') + ')</div>' +
+        '<div class="eu-path-targets">' + p.targets.map(function(t) { return '<span class="eu-target-pill">' + esc(t) + '</span>'; }).join('') + '</div>' +
+      '</div>' +
+      '<div class="eu-path-verdict">' +
+        '<div class="eu-path-verdict-label">Verdict</div>' +
+        esc(p.verdict) +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  document.getElementById('eu-country-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function switchEuropePath(pathId, btn) {
+  document.querySelectorAll('#eu-country-modal-tabs .eu-path-tab').forEach(function(t) { t.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  document.querySelectorAll('#eu-country-modal-body .eu-path-section').forEach(function(s) {
+    s.classList.toggle('active', s.getAttribute('data-path-id') === pathId);
+  });
+}
+
+function openCountdownExplainer() {
+  if (!europeRef || !europeRef.countdownExplainer) return;
+  var ex = europeRef.countdownExplainer;
+  var now = new Date();
+  var diffMs = EU_BIRTHDAY - now;
+  var days = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+
+  document.getElementById('eu-countdown-modal-hero').innerHTML =
+    '<div class="eu-modal-flag">🚨</div>' +
+    '<div class="eu-modal-title">' + esc(ex.title) + '</div>' +
+    '<div class="eu-modal-subtitle">' + esc(ex.subtitle) + ' · <strong style="color:#fca5a5">' + days + ' days left</strong></div>';
+
+  var html = '<div class="eu-explainer-block"><h4>What changes at age 30</h4><ul>' +
+    ex.what.map(function(w) { return '<li>' + esc(w) + '</li>'; }).join('') +
+  '</ul></div>';
+
+  html += '<div class="eu-explainer-block"><h4>Why this matters for YOU</h4><ul>' +
+    ex.why_matters.map(function(w) { return '<li>' + esc(w) + '</li>'; }).join('') +
+  '</ul></div>';
+
+  html += '<div class="eu-explainer-block"><h4>' + esc(ex.if_you_miss.title) + '</h4><div class="eu-fallback-grid">';
+  html += ex.if_you_miss.items.map(function(item) {
+    var flagMap = { NL:'🇳🇱', DE:'🇩🇪', IE:'🇮🇪', SE:'🇸🇪', FI:'🇫🇮', CH:'🇨🇭', BE:'🇧🇪', DK:'🇩🇰', AT:'🇦🇹', PhD:'🎓' };
+    return '<div class="eu-fallback">' +
+      '<div class="eu-fallback-flag">' + (flagMap[item.country] || '•') + '</div>' +
+      '<div class="eu-fallback-text">' + esc(item.plan) + '</div>' +
+    '</div>';
+  }).join('');
+  html += '</div></div>';
+
+  html += '<div class="eu-action-box">💡 ' + esc(ex.action) + '</div>';
+
+  document.getElementById('eu-countdown-modal-body').innerHTML = html;
+  document.getElementById('eu-countdown-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeEuropeModal(event, id) {
+  if (event && event.target !== event.currentTarget) return;
+  var el = document.getElementById(id);
+  if (el) el.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// Close modals on ESC
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    ['eu-country-modal', 'eu-countdown-modal'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el && el.classList.contains('open')) {
+        el.classList.remove('open');
+        document.body.style.overflow = '';
+      }
+    });
+  }
+});
 
 function filterEuropeCompanies(filter, btn) {
   var isCountry = ['NL', 'DE', 'SE', 'IE', 'FI', 'CH', 'BE', 'DK'].indexOf(filter) !== -1;

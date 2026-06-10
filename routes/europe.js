@@ -199,10 +199,693 @@ const ANCHORS = [
   { label: 'Months to act on under-30 visa', value: '~8 months', emoji: '⏱️' }
 ];
 
+// =================== COUNTDOWN EXPLAINER ===================
+const COUNTDOWN_EXPLAINER = {
+  title: 'Why your 30th birthday matters',
+  subtitle: 'Feb 1, 2027 — the Netherlands HSM under-30 threshold deadline',
+  what: [
+    'The Netherlands "Highly Skilled Migrant" (Kennismigrant) visa has TWO salary thresholds.',
+    'Under 30: €4,357/mo gross (€52,284/yr) — your current bar.',
+    '30 and over: €5,942/mo gross (€71,304/yr) — 36% higher.',
+    'The threshold is locked at your APPLICATION DATE — apply at 29 and you keep €52k bar even when you turn 40 inside NL.'
+  ],
+  why_matters: [
+    'For a 2-YOE Indian Java dev, €52k is achievable at many companies (Backbase, bol.com, ING).',
+    '€71k is mid-to-senior level — bar shifts to Booking, Adyen, Picnic senior IC roles.',
+    'After Feb 1, 2027, fewer Dutch companies can sponsor you cheaply.'
+  ],
+  if_you_miss: {
+    title: 'If you miss the deadline — fallback plans',
+    items: [
+      { country: 'NL', plan: 'Aim for senior IC at Booking/Adyen with €72k+ offer (still viable but bar higher)' },
+      { country: 'DE', plan: 'Germany Blue Card IT-shortage at €45,934/yr — no age threshold, very accessible' },
+      { country: 'IE', plan: 'Ireland CSEP at €38k — no age threshold; lowest bar in EU' },
+      { country: 'PhD', plan: 'PhD in NL: paid €2,800–3,400/mo as employee. PhD time counts toward PR. No HSM threshold.' },
+      { country: 'SE', plan: 'Sweden Work Permit SEK 28,480/mo (~€2,500) — no age threshold' }
+    ]
+  },
+  action: 'Best move: front-load Tier 1 NL applications between now and Dec 2026.'
+};
+
+// =================== PER-COUNTRY PLANS ===================
+// Each country has multiple "paths": job (under 30), job (post 30), PhD, PhD → industry hybrid.
+// Use this when user clicks a country card to drill into the right strategy.
+
+const COUNTRY_PLANS = {
+  NL: {
+    code: 'NL', name: 'Netherlands', flag: '🇳🇱',
+    intro: 'Best fit for under-30. HSM visa decision in 2 weeks. 30% tax ruling for first 5 years (drops to 27% from 2027). Firing protection 9/10.',
+    paths: [
+      {
+        id: 'job_under30', kind: 'job', age: 'under30',
+        title: 'Job route — Under 30', icon: '⭐',
+        threshold: '€4,357/mo gross (€52,284/yr)',
+        timeline: '4–8 weeks from offer to landing',
+        summary: 'EASIEST path. HSM under-30 threshold locked at application date — apply before Feb 1, 2027 to keep this lower bar for life.',
+        steps: [
+          'Pass AWS SAA + complete Spring Boot 3 migration story (~3 months prep)',
+          'Apply to Backbase, bol.com, Picnic, ING, Rabobank (Tier 1 — match your stack)',
+          'Pass HackerRank screen + system design interview',
+          'Offer → employer files HSM visa (IND 2-week SLA for recognized sponsors)',
+          'Move to Amsterdam. 30% tax ruling kicks in (saves ~€8k/yr on €65k base)',
+          'PR after 5 years with A2 Dutch'
+        ],
+        targets: ['Backbase', 'bol.com', 'Picnic', 'ING', 'Rabobank', 'ABN AMRO', 'Booking.com', 'Adyen'],
+        salary: '€55–72k base. With 30% ruling, ~€4,100/mo net.',
+        verdict: '⭐ Top recommended path for your profile.'
+      },
+      {
+        id: 'job_post30', kind: 'job', age: 'post30',
+        title: 'Job route — Post 30', icon: '💼',
+        threshold: '€5,942/mo gross (€71,304/yr)',
+        timeline: '4–8 weeks from offer; harder to find offers at this band',
+        summary: 'Threshold jumps 36% at age 30. You need a senior-level offer. Doable but the bar shifts from mid to senior IC.',
+        steps: [
+          'Build 4+ YOE total before applying (2 more years at Toqqer or similar)',
+          'Specialize: become known for distributed systems / payments / cloud architecture',
+          'Target senior IC roles at Booking, Adyen, Picnic, ING senior tech',
+          'Push base offers to €72k+ — negotiate hard against levels.fyi data',
+          'Alternative: EU Blue Card route €5,688/mo for IT-shortage occupations',
+          'Alternative: Orientation Year visa (Zoekjaar) AFTER a Dutch Master\'s = 12 months free job-search'
+        ],
+        targets: ['Booking.com senior', 'Adyen senior', 'Picnic platform', 'ING senior architect', 'KLM tech', 'Albert Heijn senior'],
+        salary: '€72–95k base. Still gets 30% ruling.',
+        verdict: 'Strong path but you need a sharper specialization.'
+      },
+      {
+        id: 'phd', kind: 'phd', age: 'any',
+        title: 'PhD route', icon: '🎓',
+        threshold: 'PhDs are EMPLOYEES in NL: €2,800–3,400/mo gross',
+        timeline: '4 years funded as TU employee',
+        summary: 'Dutch PhDs are paid employees, not students. Strong AI/CS programs. PhD time counts toward PR clock.',
+        steps: [
+          'Identify supervisor + group match: distributed systems / ML / data engineering',
+          'Apply via academictransfer.com (Jan–Apr for Sep start)',
+          'Need: MTech (✓), publication (✓ Springer LNNS), GRE optional, IELTS 6.5+',
+          'Universities for your background: TU Delft (Distributed Systems), TU Eindhoven (Data Science Center), UvA (Informatics Institute), VU (VU Network Institute)',
+          'Defend in 4 years → 30% ruling continues, pivot to industry'
+        ],
+        targets: ['TU Delft', 'TU Eindhoven', 'University of Amsterdam (UvA)', 'VU Amsterdam', 'Leiden', 'University of Groningen'],
+        salary: '€2,800–3,400/mo as PhD employee (gross). Net ~€2,200 with 30% ruling.',
+        verdict: 'Your Springer publication + MTech NIT make you a strong candidate.'
+      },
+      {
+        id: 'phd_to_job', kind: 'combined', age: 'any',
+        title: 'PhD → Industry hybrid', icon: '🔀',
+        threshold: 'PhD years count toward HSM 5-year PR clock',
+        timeline: '4 yr PhD + immediate industry pivot',
+        summary: 'Smart hybrid: PhD gives you 4 paid years in NL, builds research profile, AND counts toward PR.',
+        steps: [
+          'Start PhD year 1 at TU Delft/UvA/TU Eindhoven',
+          'Summer internships year 2+ at Booking, Google Amsterdam, Adyen, ING AI Lab',
+          'Build industry relationships during PhD',
+          'Defend → pivot to Senior Research Engineer / Staff Engineer roles',
+          'PR eligible by year 5 (PhD time counts toward residence)',
+          'Pay range post-PhD: €75–100k base'
+        ],
+        targets: ['Booking Research', 'Google Amsterdam', 'Adyen', 'ING AI Lab', 'TomTom Research'],
+        salary: '€2,800/mo during PhD → €75–100k post-PhD industry pivot.',
+        verdict: 'Highest ceiling. Longest commitment. Best for AI/ML pivot or research-engineer track.'
+      }
+    ]
+  },
+
+  DE: {
+    code: 'DE', name: 'Germany', flag: '🇩🇪',
+    intro: 'No age-based threshold. Most accessible visa system in EU. PhDs paid as researchers (TV-L E13 ~€50k/yr). Firing protection 8/10 after 6mo probation.',
+    paths: [
+      {
+        id: 'job_under30', kind: 'job', age: 'under30',
+        title: 'Job route — Blue Card', icon: '💳',
+        threshold: '€45,934/yr (IT shortage) — no age component',
+        timeline: '4–8 weeks visa from India',
+        summary: 'Germany has the most accessible EU visa for your profile. No age discount, but the base threshold is already low.',
+        steps: [
+          'Build same prep as NL plan (Java 21, SB3, AWS, K8s)',
+          'Apply to Zalando, Personio, N26, Trivago, Delivery Hero (English-only)',
+          'OR Chancenkarte (Opportunity Card) — you score 10/6 needed points',
+          'Blue Card processed at German embassy in India (4–8 weeks)',
+          'PR after 21 months with B1 German, 27 with A1, 33 without',
+          'Citizenship at 5 years (new 2024 law)'
+        ],
+        targets: ['Zalando (Berlin)', 'Personio (Munich)', 'N26 (Berlin)', 'Celonis (Munich)', 'Delivery Hero', 'Trivago', 'SAP (direct)'],
+        salary: '€60–80k Berlin, €65–90k Munich. No 30% ruling but lower cost of living.',
+        verdict: 'Best backup if NL doesn\'t work. Or primary if you want zero deadline pressure.'
+      },
+      {
+        id: 'job_post30', kind: 'job', age: 'post30',
+        title: 'Job route — Post 30 (same Blue Card)', icon: '💼',
+        threshold: '€45,934/yr (IT shortage) — UNCHANGED at 30',
+        timeline: 'Same — 4–8 weeks',
+        summary: 'No threshold change at 30. Germany doesn\'t penalize age — this is its biggest advantage over NL.',
+        steps: [
+          'Same as under-30 path',
+          'More YOE actually helps (German Mittelstand values seniority)',
+          'Salary expectations rise: target €75–90k for 4+ YOE',
+          'Senior roles at SAP, BMW, Mercedes R&D become accessible'
+        ],
+        targets: ['SAP SE', 'BMW Tech', 'Mercedes-Benz R&D', 'Allianz Tech', 'Siemens', 'Bosch Global Software'],
+        salary: '€75–110k for 4+ YOE.',
+        verdict: 'Germany is your "no deadline" safety net.'
+      },
+      {
+        id: 'phd', kind: 'phd', age: 'any',
+        title: 'PhD route — TV-L E13 paid', icon: '🎓',
+        threshold: 'PhDs paid TV-L E13: ~€50k/yr gross (researcher contract)',
+        timeline: '3–5 years (varies by program)',
+        summary: 'German PhDs are paid employees, not students. World-class CS programs. PhD time counts toward Blue Card residency.',
+        steps: [
+          'Apply directly to PhD positions on DAAD database, university job boards',
+          'Top universities for your profile: TUM, RWTH Aachen, TU Darmstadt, MPI for Informatics (Saarbrücken)',
+          'No GRE required; need MTech + IELTS/TOEFL + proposal',
+          'Your Springer publication + intrusion detection ML work is strong fit',
+          'TV-L E13 pays €4,000–4,800/mo gross (full-time researcher)',
+          'PR after 4 years (PhD years count)'
+        ],
+        targets: ['TUM Informatics', 'RWTH Aachen', 'TU Darmstadt', 'MPI Informatik (Saarbrücken)', 'KIT (Karlsruhe)', 'University of Stuttgart'],
+        salary: '€4,000–4,800/mo gross during PhD. ~€2,700/mo net.',
+        verdict: '🌟 STRONGEST PhD option in EU for your profile. Paid as researcher, no tuition, world-class.'
+      },
+      {
+        id: 'phd_to_job', kind: 'combined', age: 'any',
+        title: 'PhD → SAP / BMW / Siemens R&D', icon: '🔀',
+        threshold: 'PhD counts toward residency; smooth Blue Card transition',
+        timeline: '3–5 yr PhD + industry pivot',
+        summary: 'German PhD → industry R&D is a paved road. SAP, BMW, Mercedes-Benz, Siemens have direct PhD-to-Staff-Engineer pipelines.',
+        steps: [
+          'PhD at TUM, RWTH, or MPI',
+          'Industry collaboration during PhD (most German PhDs do this)',
+          'Defend → join SAP Research, BMW AI, Mercedes R&D as Senior Research Engineer',
+          'Or join Bosch Center for AI (Bosch CR)',
+          'Salary post-PhD: €80–120k'
+        ],
+        targets: ['SAP Research', 'BMW AI / Group Research', 'Mercedes-Benz R&D', 'Bosch Center for AI', 'Siemens AI Lab'],
+        salary: '€4,500/mo during PhD → €80–120k post-PhD.',
+        verdict: 'Best EV combined path. PhD is paid + industry payoff is massive.'
+      }
+    ]
+  },
+
+  SE: {
+    code: 'SE', name: 'Sweden', flag: '🇸🇪',
+    intro: 'Strongest firing protection (LAS still robust post-2022 reform). Doctoral candidates are employees. Low work-permit salary bar.',
+    paths: [
+      {
+        id: 'job_under30', kind: 'job', age: 'under30',
+        title: 'Job route — Work Permit', icon: '💳',
+        threshold: 'SEK 28,480/mo (~€2,500) — no age component',
+        timeline: '2–6 months; 30 days for certified employers',
+        summary: 'Low salary bar but Swedish tech is competitive. Strong fit for stable, long-term career.',
+        steps: [
+          'Apply to Spotify, Klarna, Ericsson, Volvo Cars, Truecaller',
+          'Truecaller especially Indian-friendly (Indian-founded)',
+          'Pass interview loop (Spotify and Klarna are FAANG-tier)',
+          'Sponsor files Migrationsverket application',
+          'Move to Stockholm or Gothenburg',
+          'PR after 4 years; citizenship after 5'
+        ],
+        targets: ['Spotify', 'Klarna', 'Ericsson', 'Volvo Cars', 'Truecaller', 'IKEA Digital', 'King (Activision)', 'Tink'],
+        salary: 'SEK 600–800k (~€53–70k). Effective tax ~50%.',
+        verdict: 'Strong path if firing protection is top priority.'
+      },
+      {
+        id: 'job_post30', kind: 'job', age: 'post30',
+        title: 'Job route — Post 30 (same)', icon: '💼',
+        threshold: 'Same SEK 28,480/mo — no age effect',
+        timeline: 'Same',
+        summary: 'No age-based change. Senior roles are more competitive but no visa penalty.',
+        steps: [
+          'Same as under-30, but target senior IC roles',
+          'Volvo Cars autonomous driving / Polestar EV are growing',
+          'KTH connections help (alumni network)'
+        ],
+        targets: ['Spotify senior', 'Klarna staff', 'Volvo Cars senior', 'Ericsson principal', 'Polestar'],
+        salary: 'SEK 800k–1.1M (€70–96k) for 4+ YOE.',
+        verdict: 'Same EV as under-30 path.'
+      },
+      {
+        id: 'phd', kind: 'phd', age: 'any',
+        title: 'PhD route — KTH / Chalmers', icon: '🎓',
+        threshold: 'Doctoral candidates are employees: ~SEK 35,000/mo gross (~€3,100)',
+        timeline: '4 years funded',
+        summary: 'Swedish PhDs are employees with social benefits. Strong CS programs at KTH (Stockholm), Chalmers (Gothenburg), Lund.',
+        steps: [
+          'Apply directly to advertised PhD positions (varbi.com, university sites)',
+          'Top: KTH Royal Institute of Technology, Chalmers, Lund, Uppsala',
+          'KTH especially strong in distributed systems + ML',
+          'Need MTech + supervisor match',
+          'Salary increases with seniority (research vs teaching duties)',
+          'PR after 4 yrs (PhD time counts)'
+        ],
+        targets: ['KTH (Stockholm)', 'Chalmers (Gothenburg)', 'Lund University', 'Uppsala University', 'Linköping (computer vision)'],
+        salary: 'SEK 35,000–40,000/mo gross during PhD.',
+        verdict: 'KTH → Spotify/Klarna is a proven pipeline.'
+      },
+      {
+        id: 'phd_to_job', kind: 'combined', age: 'any',
+        title: 'PhD → Spotify / Klarna pipeline', icon: '🔀',
+        threshold: 'Smooth transition; PhD years count toward PR',
+        timeline: '4 yr PhD + industry',
+        summary: 'KTH grads have a proven pipeline into Spotify, Klarna, Ericsson Research, and Volvo Cars autonomous driving.',
+        steps: [
+          'PhD at KTH or Chalmers',
+          'Industry collaboration is encouraged (KTH explicitly partners with Ericsson, Spotify)',
+          'Defend → join as Staff / Principal Engineer or Researcher',
+          'Strong unions (Sweco / Akademikerförbundet) protect post-PhD job'
+        ],
+        targets: ['Spotify Research', 'Klarna Tech', 'Ericsson Research', 'Volvo Cars Autonomous'],
+        salary: 'SEK 850k–1.2M post-PhD (€75–105k).',
+        verdict: 'High EV but Sweden is small market — fewer industry options than NL/DE.'
+      }
+    ]
+  },
+
+  IE: {
+    code: 'IE', name: 'Ireland', flag: '🇮🇪',
+    intro: 'English-speaking. FAANG EU HQs (Google, Meta, Stripe, Workday). Easiest entry but WEAK firing protection first 12 months.',
+    paths: [
+      {
+        id: 'job_under30', kind: 'job', age: 'under30',
+        title: 'Job route — Critical Skills Permit (CSEP)', icon: '💳',
+        threshold: '€38,000/yr — no age component, lowest EU threshold',
+        timeline: '4–8 weeks (trusted partner) to 8–13 weeks standard',
+        summary: 'Lowest salary bar in EU. Easy entry. But: effectively at-will for first 12 months.',
+        steps: [
+          'Apply to Stripe, Workday, Mastercard, Fidelity, HubSpot, Intuit',
+          'Software dev is on the Critical Skills List (no labor market test)',
+          'Pass interview loop (Stripe is FAANG-bar)',
+          'Employer files CSEP application',
+          'Move to Dublin; Stamp 4 (PR) after 2 years',
+          'Citizenship after 5 years residence'
+        ],
+        targets: ['Stripe', 'Workday', 'Mastercard', 'Fidelity Investments', 'HubSpot', 'Salesforce', 'Microsoft / LinkedIn', 'Intuit', 'Google Dublin', 'Meta Dublin'],
+        salary: '€55–75k base. SARP tax relief (35%) if eligible.',
+        verdict: 'Strong if you accept the 12-month probation risk.'
+      },
+      {
+        id: 'job_post30', kind: 'job', age: 'post30',
+        title: 'Job route — Post 30 (same)', icon: '💼',
+        threshold: 'Same €38k — no age effect',
+        timeline: 'Same',
+        summary: 'No age penalty. Senior roles at FAANG Dublin become accessible with more YOE.',
+        steps: [
+          'Same path, target senior IC roles',
+          'Google/Meta/Stripe Dublin senior IC = €100k+ base',
+          'Mastercard / Fidelity = stable enterprise Java tracks'
+        ],
+        targets: ['Google senior', 'Meta senior', 'Stripe senior', 'Mastercard staff', 'Fidelity senior'],
+        salary: '€85–130k for 4+ YOE.',
+        verdict: 'Same path, higher pay band.'
+      },
+      {
+        id: 'phd', kind: 'phd', age: 'any',
+        title: 'PhD route — TCD / UCD', icon: '🎓',
+        threshold: 'Stipend ~€18,500–22,000/yr tax-free (SFI Centre funding)',
+        timeline: '4 years',
+        summary: 'Irish PhDs are stipend-funded (not employee contracts). Lower pay than NL/DE/SE but tax-free.',
+        steps: [
+          'Top: Trinity College Dublin (TCD), University College Dublin (UCD)',
+          'SFI Centre-funded positions are best (~€22k tax-free + tuition waiver)',
+          'Need MTech + supervisor + research proposal',
+          'TCD strong in AI/ML, UCD strong in distributed systems',
+          'PhD years can count toward Stamp 4 eligibility'
+        ],
+        targets: ['Trinity College Dublin', 'University College Dublin', 'National University of Ireland Galway', 'Dublin City University', 'University of Limerick'],
+        salary: '€18,500–22,000/yr stipend (tax-free).',
+        verdict: 'Lower pay than NL/DE/SE PhD. Only do it if specific advisor match.'
+      },
+      {
+        id: 'phd_to_job', kind: 'combined', age: 'any',
+        title: 'PhD → FAANG Dublin', icon: '🔀',
+        threshold: 'PhD → Stamp 4 + senior IC at FAANG Dublin',
+        timeline: '4 yr PhD + industry',
+        summary: 'TCD/UCD PhDs have direct paths to Google, Meta, Stripe Dublin research/engineering teams.',
+        steps: [
+          'PhD at TCD or UCD',
+          'Industry collaboration via SFI Centre partnerships',
+          'Defend → pivot to FAANG Dublin or Mastercard Labs',
+          'Senior IC offers €120–160k post-PhD'
+        ],
+        targets: ['Google Dublin Research', 'Meta Dublin', 'Stripe Engineering', 'Mastercard Labs', 'Workday R&D'],
+        salary: 'Stipend → €120–160k post-PhD industry pivot.',
+        verdict: 'Decent but Germany is better PhD EV.'
+      }
+    ]
+  },
+
+  FI: {
+    code: 'FI', name: 'Finland', flag: '🇫🇮',
+    intro: 'Strong firing protection. Aalto University → Helsinki tech pipeline. Wolt, Nokia hire Indian engineers regularly. Foreign expert tax (32% flat first 4 yrs).',
+    paths: [
+      {
+        id: 'job_under30', kind: 'job', age: 'under30',
+        title: 'Job route — Specialist Permit', icon: '💳',
+        threshold: '€3,827/mo — no age component',
+        timeline: '14 days fast-track (certified employer) to 1–3 months',
+        summary: 'Foreign expert tax = 32% flat for first 4 years (saves vs normal ~46% bracket). Wolt/Nokia hire from India directly.',
+        steps: [
+          'Apply to Wolt (Helsinki) — Java/Kotlin, active sponsor',
+          'Nokia — largest Indian tech employer in FI',
+          'Supercell, F-Secure, Reaktor, Smartly.io',
+          'Sponsor files Migri specialist permit',
+          'D-visa allows entry while waiting for residence card',
+          'PR after 4 yrs continuous A-permit'
+        ],
+        targets: ['Wolt (DoorDash)', 'Nokia', 'Supercell', 'F-Secure / WithSecure', 'Reaktor', 'Smartly.io', 'Vaisala', 'OP Financial'],
+        salary: '€55–75k base. Net ~€3,200/mo with foreign expert tax.',
+        verdict: 'Solid alternative to NL/DE for stability-focused candidates.'
+      },
+      {
+        id: 'job_post30', kind: 'job', age: 'post30',
+        title: 'Job route — Post 30 (same)', icon: '💼',
+        threshold: 'Same €3,827/mo — no age effect',
+        timeline: 'Same',
+        summary: 'No threshold change. Nokia and Wolt favor experienced engineers.',
+        steps: [
+          'Same path, target senior IC at Nokia 5G/6G R&D or Wolt platform',
+          'Nokia Bell Labs research roles open up with seniority'
+        ],
+        targets: ['Nokia Bell Labs', 'Wolt platform', 'Supercell senior', 'F-Secure principal'],
+        salary: '€75–95k for 4+ YOE.',
+        verdict: 'Strong stable career path.'
+      },
+      {
+        id: 'phd', kind: 'phd', age: 'any',
+        title: 'PhD route — Aalto', icon: '🎓',
+        threshold: 'Doctoral researchers paid: €2,800–3,800/mo gross',
+        timeline: '4 years funded',
+        summary: 'Aalto University is the strongest CS PhD destination. University of Helsinki strong in ML. Both pay PhD researchers as employees.',
+        steps: [
+          'Apply directly to Aalto / U Helsinki PhD positions',
+          'Aalto especially strong in distributed systems, security, ML',
+          'Need MTech + supervisor match',
+          'Foreign expert tax applies to PhDs too'
+        ],
+        targets: ['Aalto University', 'University of Helsinki', 'Tampere University', 'University of Oulu', 'University of Turku'],
+        salary: '€2,800–3,800/mo gross.',
+        verdict: 'Aalto PhD → Helsinki tech pipeline is well-established.'
+      },
+      {
+        id: 'phd_to_job', kind: 'combined', age: 'any',
+        title: 'PhD → Nokia / Wolt / Supercell', icon: '🔀',
+        threshold: 'PhD years count toward PR',
+        timeline: '4 yr PhD + industry',
+        summary: 'Aalto PhDs have direct paths to Nokia Bell Labs, Wolt platform, F-Secure research.',
+        steps: [
+          'PhD at Aalto',
+          'Industry collaboration via Aalto Industrial Internet Campus',
+          'Defend → Nokia Bell Labs / F-Secure / Wolt R&D',
+          'Senior IC: €85–110k post-PhD'
+        ],
+        targets: ['Nokia Bell Labs', 'F-Secure Research', 'Wolt Engineering', 'Supercell Tech'],
+        salary: '€85–110k post-PhD.',
+        verdict: 'Strong path. Smaller market than NL/DE.'
+      }
+    ]
+  },
+
+  CH: {
+    code: 'CH', name: 'Switzerland', flag: '🇨🇭',
+    intro: 'World-class PhD destination (ETH Zurich, EPFL). Job market QUOTA-LIMITED for non-EU and weak firing protection. PhD is the only winning angle.',
+    paths: [
+      {
+        id: 'job_under30', kind: 'job', age: 'under30',
+        title: 'Job route — Permit B (DIFFICULT)', icon: '⚠️',
+        threshold: 'No federal minimum but cantonal "ortsüblich" enforced; CHF 95k–115k effective',
+        timeline: 'QUOTA-limited; ~8,500 total non-EU permits/year; Zurich quota exhausts by Q3',
+        summary: 'Switzerland is hard for 2-YOE Indians. Quota system + employer must prove no Swiss/EU candidate available + weak firing protection.',
+        steps: [
+          'Not recommended at 2 YOE',
+          'If you do try: target Google Zurich, Meta Zurich, Microsoft (they bypass quota easier)',
+          'Need to clear FAANG-tier interview bar',
+          'Permit C (PR) only after 10 years — much longer than other EU'
+        ],
+        targets: ['Google Zurich (very tough)', 'Meta Zurich', 'Microsoft Switzerland'],
+        salary: 'CHF 110–160k. Highest take-home in EU.',
+        verdict: '🚫 SKIP at 2 YOE. Revisit at 5+ YOE.'
+      },
+      {
+        id: 'job_post30', kind: 'job', age: 'post30',
+        title: 'Job route — Post 30 (more accessible)', icon: '💼',
+        threshold: 'Same Permit B + cantonal salary',
+        timeline: 'Quota-limited but employer leverage helps',
+        summary: 'Senior IC (5+ YOE) with FAANG offer is the realistic path.',
+        steps: [
+          'Build 5+ YOE',
+          'Aim for senior IC at Google Zurich / Meta Zurich',
+          'Specialize in distributed systems or ML infra',
+          'Negotiate hard — Swiss comp is the highest in Europe'
+        ],
+        targets: ['Google Zurich senior', 'Meta Zurich senior', 'Roche pharma tech', 'UBS / Credit Suisse'],
+        salary: 'CHF 140–200k base + RSUs.',
+        verdict: 'Wait until you have 5+ YOE and a FAANG offer.'
+      },
+      {
+        id: 'phd', kind: 'phd', age: 'any',
+        title: 'PhD route — ETH Zurich / EPFL', icon: '🎓',
+        threshold: 'Paid as research / teaching assistant: CHF 65–80k/yr gross',
+        timeline: '4–5 years funded',
+        summary: '🌟 STRONGEST PhD in Europe (arguably world-class). ETH Zurich, EPFL pay PhDs as employees at very high rates.',
+        steps: [
+          'ETH Zurich (Department of Computer Science) — top 3 worldwide',
+          'EPFL Lausanne — strong AI/ML',
+          'University of Zurich (DZNE/AI Center) — strong NLP',
+          'Need very strong profile: MTech + publications + GRE 320+ + IELTS 7.5+',
+          'Your Springer publication is a plus but ETH/EPFL bar is very high',
+          'PhD years pay so well you SAVE during PhD'
+        ],
+        targets: ['ETH Zurich CS Department', 'EPFL (Lausanne)', 'University of Zurich', 'University of Basel'],
+        salary: 'CHF 65–80k/yr (~€68–85k). Highest PhD pay in Europe.',
+        verdict: '⭐ If you want PhD, this is THE top destination globally. Pay is also incredible.'
+      },
+      {
+        id: 'phd_to_job', kind: 'combined', age: 'any',
+        title: 'PhD → Google Zurich / FAANG', icon: '🔀',
+        threshold: 'ETH/EPFL PhD bypasses most Swiss visa quota issues',
+        timeline: '4–5 yr PhD + industry',
+        summary: 'ETH/EPFL CS PhDs have the strongest industry pipeline in Europe: Google Zurich, DeepMind, Meta AI, Apple, financial sector all hire directly.',
+        steps: [
+          'PhD at ETH or EPFL',
+          'Industry internships at Google Brain Zurich, DeepMind, Apple AI',
+          'Defend → top of the market: Staff Engineer / Senior Research Scientist',
+          'Post-PhD offers commonly CHF 200k+ TC',
+          'Permit C path easier as PhD employee'
+        ],
+        targets: ['Google Zurich', 'Google DeepMind', 'Meta AI Zurich', 'Apple AI', 'DisneyResearch', 'Roche Pharma Tech', 'UBS quant'],
+        salary: 'CHF 65k during PhD → CHF 200–300k post-PhD.',
+        verdict: '🏆 HIGHEST EV path in this entire plan. Bar is brutal but payoff is unmatched.'
+      }
+    ]
+  },
+
+  BE: {
+    code: 'BE', name: 'Belgium', flag: '🇧🇪',
+    intro: 'Strong firing protection (8/10). Salary threshold high for 2 YOE. Better target after 4+ YOE. KU Leuven world-class for PhD.',
+    paths: [
+      {
+        id: 'job_under30', kind: 'job', age: 'under30',
+        title: 'Job route — Single Permit', icon: '⚠️',
+        threshold: '€49,000–50,310/yr — too high for 2 YOE',
+        timeline: '3–4 months',
+        summary: 'Threshold too high for entry-level. Revisit after 4+ YOE.',
+        steps: [
+          'Build to 4+ YOE first',
+          'Or target SWIFT, Euroclear (banking infra)',
+          'Companies: Showpad, Collibra, ING Belgium'
+        ],
+        targets: ['SWIFT (La Hulpe)', 'Euroclear', 'KBC Bank', 'Showpad', 'Collibra'],
+        salary: '€55–75k base.',
+        verdict: '⏸️ Wait until 4 YOE.'
+      },
+      {
+        id: 'job_post30', kind: 'job', age: 'post30',
+        title: 'Job route — Post 30 (accessible)', icon: '💼',
+        threshold: 'Same €49k+ — but achievable with 4+ YOE',
+        timeline: '3–4 months',
+        summary: 'After 4 YOE the threshold is achievable. Banking + biotech are growing.',
+        steps: [
+          'Target Euroclear / SWIFT / KBC senior Java',
+          'AB InBev Tech (Leuven) — global brewery tech',
+          'Brussels banking sector pays well'
+        ],
+        targets: ['Euroclear senior', 'SWIFT senior', 'AB InBev Tech', 'KBC senior'],
+        salary: '€70–95k for 4+ YOE.',
+        verdict: 'Decent path post-30.'
+      },
+      {
+        id: 'phd', kind: 'phd', age: 'any',
+        title: 'PhD route — KU Leuven', icon: '🎓',
+        threshold: 'Paid as researcher: ~€2,200–2,800/mo gross',
+        timeline: '4 years',
+        summary: 'KU Leuven is consistently top-5 EU for CS. UCLouvain also strong. Both pay PhDs as employees.',
+        steps: [
+          'KU Leuven (top program)',
+          'UCLouvain (Louvain-la-Neuve)',
+          'Ghent University',
+          'PhD years count toward residence'
+        ],
+        targets: ['KU Leuven', 'UCLouvain', 'Ghent University', 'VUB (Brussels)'],
+        salary: '€2,200–2,800/mo gross.',
+        verdict: 'KU Leuven is excellent if research interests align.'
+      },
+      {
+        id: 'phd_to_job', kind: 'combined', age: 'any',
+        title: 'PhD → European Tech Hub', icon: '🔀',
+        threshold: 'PhD time counts toward residence',
+        timeline: '4 yr PhD + industry',
+        summary: 'KU Leuven PhDs go to Collibra, Showpad, SWIFT research, or European Commission tech roles.',
+        steps: [
+          'PhD at KU Leuven',
+          'Industry: Collibra (data lineage), Showpad (sales enablement)',
+          'European Commission has tech research roles for EU residents'
+        ],
+        targets: ['Collibra', 'Showpad', 'SWIFT Research', 'European Commission Tech'],
+        salary: '€70–95k post-PhD.',
+        verdict: 'Decent but Germany/Switzerland are stronger.'
+      }
+    ]
+  },
+
+  DK: {
+    code: 'DK', name: 'Denmark', flag: '🇩🇰',
+    intro: 'High salaries but "flexicurity" = easy firing despite Nordic reputation. PhD is the strong angle. DTU and Copenhagen are top.',
+    paths: [
+      {
+        id: 'job_under30', kind: 'job', age: 'under30',
+        title: 'Job route — Pay Limit Scheme', icon: '⚠️',
+        threshold: 'DKK 514,000/yr (~€69,000) — high',
+        timeline: '1–3 months (Fast-Track for certified employers)',
+        summary: 'High salary bar but easy firing. Maersk, Novo Nordisk, Unity sponsor IT roles.',
+        steps: [
+          'Target Maersk, Novo Nordisk, Unity, Trustpilot, Pleo',
+          'Fast-Track Scheme available with certified employers',
+          'PR after 4 years'
+        ],
+        targets: ['Maersk', 'Novo Nordisk (tech)', 'Unity (Copenhagen)', 'Trustpilot', 'Pleo', 'Lego Digital'],
+        salary: 'DKK 600–800k base.',
+        verdict: 'Skip unless very high offer + flexicurity acceptable.'
+      },
+      {
+        id: 'job_post30', kind: 'job', age: 'post30',
+        title: 'Job route — Post 30', icon: '💼',
+        threshold: 'Same DKK 514k',
+        timeline: 'Same',
+        summary: 'Senior IC roles at Maersk / Unity are accessible. Same firing risk.',
+        steps: ['Build YOE first', 'Target senior IC', 'Negotiate generous severance upfront'],
+        targets: ['Maersk senior', 'Unity senior', 'Novo Nordisk staff'],
+        salary: 'DKK 800k–1.1M.',
+        verdict: 'Same risk profile.'
+      },
+      {
+        id: 'phd', kind: 'phd', age: 'any',
+        title: 'PhD route — DTU / Copenhagen', icon: '🎓',
+        threshold: 'PhDs paid ~DKK 30,000/mo gross + tax-free researcher status (27% flat 7 yrs)',
+        timeline: '3 years (shorter than NL/DE/SE)',
+        summary: 'DTU (Technical University of Denmark) and University of Copenhagen pay PhDs as researchers. 27% flat tax for 7 years is excellent.',
+        steps: [
+          'DTU — strong systems/AI/cybersecurity',
+          'University of Copenhagen — Department of Computer Science',
+          'Aarhus University — CS strong in algorithms',
+          '27% Researcher tax + standard PhD pay = competitive net pay'
+        ],
+        targets: ['DTU', 'University of Copenhagen', 'Aarhus University', 'IT University of Copenhagen'],
+        salary: 'DKK 30,000+/mo (~€4,000), 27% flat tax = excellent net.',
+        verdict: 'PhD is the strongest Denmark angle.'
+      },
+      {
+        id: 'phd_to_job', kind: 'combined', age: 'any',
+        title: 'PhD → Maersk / Novo Nordisk Tech', icon: '🔀',
+        threshold: 'PhD time counts toward PR',
+        timeline: '3 yr PhD + industry',
+        summary: 'DTU PhDs go to Maersk Tech, Novo Nordisk, Unity, or pharma research.',
+        steps: ['PhD at DTU', 'Industry: Maersk / Novo Nordisk / Lego Digital', 'PR after PhD'],
+        targets: ['Maersk Tech', 'Novo Nordisk', 'Unity Research', 'Lego Digital'],
+        salary: 'DKK 800k+ post-PhD.',
+        verdict: 'Good combined path. PhD bypasses easy-firing risk for 3 years.'
+      }
+    ]
+  },
+
+  AT: {
+    code: 'AT', name: 'Austria', flag: '🇦🇹',
+    intro: 'Strong protections. Small tech market. ISTA and TU Wien are world-class research. German language helpful for jobs, not PhD.',
+    paths: [
+      {
+        id: 'job_under30', kind: 'job', age: 'under30',
+        title: 'Job route — RWR Card', icon: '⚠️',
+        threshold: '€3,030/mo (~€42k) for ICT shortage occupation',
+        timeline: '8 weeks statutory; 2–4 months actual',
+        summary: 'Threshold accessible but tech market is small. German language strongly helpful.',
+        steps: [
+          'Target Bitpanda, Dynatrace, Tricentis',
+          'A1 Telekom, Erste Group banking',
+          'Start learning German A1+'
+        ],
+        targets: ['Bitpanda (Vienna)', 'Dynatrace', 'Tricentis', 'A1 Telekom', 'Erste Group', 'Runtastic (adidas)'],
+        salary: '€55–75k.',
+        verdict: 'OK backup option. German barrier real.'
+      },
+      {
+        id: 'job_post30', kind: 'job', age: 'post30',
+        title: 'Job route — Post 30', icon: '💼',
+        threshold: 'Same €3,030/mo',
+        timeline: 'Same',
+        summary: 'Same threshold; senior roles more accessible.',
+        steps: ['Same path, target senior IC roles'],
+        targets: ['Bitpanda senior', 'Dynatrace principal'],
+        salary: '€75–95k.',
+        verdict: 'Same profile.'
+      },
+      {
+        id: 'phd', kind: 'phd', age: 'any',
+        title: 'PhD route — ISTA / TU Wien', icon: '🎓',
+        threshold: 'PhDs paid ~€2,500/mo (TU Wien) to €3,000/mo (ISTA)',
+        timeline: '3–4 years',
+        summary: 'ISTA (Institute of Science and Technology Austria) is world-class research; TU Wien also strong CS. Both pay PhDs as employees.',
+        steps: [
+          'ISTA (Klosterneuburg) — top-3 research institute in Europe',
+          'TU Wien — top Austrian CS program',
+          'University of Vienna',
+          'English-language PhDs available (no German required)'
+        ],
+        targets: ['ISTA (Klosterneuburg)', 'TU Wien', 'University of Vienna', 'JKU Linz', 'University of Innsbruck'],
+        salary: '€2,500–3,000/mo gross.',
+        verdict: 'ISTA is hidden gem — world-class research, English-only, full funding.'
+      },
+      {
+        id: 'phd_to_job', kind: 'combined', age: 'any',
+        title: 'PhD → European Tech', icon: '🔀',
+        threshold: 'PhD time counts toward residence',
+        timeline: '3–4 yr PhD + industry',
+        summary: 'ISTA/TU Wien PhDs can pivot to Bitpanda, Dynatrace, or move to Germany/Switzerland.',
+        steps: ['PhD at ISTA or TU Wien', 'Industry: Bitpanda / Dynatrace', 'Or relocate to DE/CH post-PhD with EU mobility'],
+        targets: ['Bitpanda', 'Dynatrace', 'Or relocate to DE/CH'],
+        salary: '€70–95k post-PhD.',
+        verdict: 'Use Austria as PhD springboard to bigger EU markets.'
+      }
+    ]
+  }
+};
+
 // =================== ROUTES ===================
 
 router.get('/europe/reference', (req, res) => {
-  res.json({ countries: COUNTRIES, companies: COMPANIES, skills: SKILLS, prepPlan: PREP_PLAN, anchors: ANCHORS });
+  res.json({
+    countries: COUNTRIES,
+    companies: COMPANIES,
+    skills: SKILLS,
+    prepPlan: PREP_PLAN,
+    anchors: ANCHORS,
+    countdownExplainer: COUNTDOWN_EXPLAINER,
+    countryPlans: COUNTRY_PLANS
+  });
+});
+
+router.get('/europe/country/:code', (req, res) => {
+  const code = (req.params.code || '').toUpperCase();
+  const plan = COUNTRY_PLANS[code];
+  if (!plan) return res.status(404).json({ error: 'Country not found' });
+  res.json(plan);
 });
 
 router.get('/europe/progress', async (req, res) => {
