@@ -1305,12 +1305,46 @@
     .nav { padding: 0 12px; }
     .container { padding: 16px 12px; }
   }
+
+  .nav-toggle { display: none; background: transparent; border: 1px solid var(--border-1); color: #fafafa; font-size: 20px; padding: 4px 12px; border-radius: 6px; cursor: pointer; line-height: 1; }
+  .nav-toggle:hover { background: rgba(255,255,255,.05); }
+  @media (max-width: 900px) {
+    .nav { flex-wrap: wrap; align-items: center; padding: 8px 16px; }
+    .nav h1 { flex: 1; margin: 0; font-size: 18px; }
+    .nav-toggle { display: inline-flex; }
+    .nav > .nav-btn, .nav > span { display: none; }
+    .nav.open > .nav-btn, .nav.open > span { display: inline-flex; width: 100%; text-align: left; margin-top: 4px; }
+    .nav.open > span#nav-user-email { padding: 8px 0; }
+  }
+
+  #tab-plan90 { padding-bottom: 60px; }
+  .plan-hero { background: linear-gradient(135deg, rgba(34,197,94,.10), rgba(20,184,166,.10)); border: 1px solid rgba(34,197,94,.25); padding: 24px; border-radius: 14px; margin-bottom: 22px; }
+  .plan-hero h2 { margin: 0 0 6px; font-size: 24px; color: #fafafa; }
+  .plan-hero p { margin: 0; color: #a1a1aa; font-size: 14px; line-height: 1.6; }
+  .plan-section { background: var(--bg-1); border: 1px solid var(--border-1); border-radius: 14px; padding: 22px; margin-bottom: 18px; }
+  .plan-section h3 { margin: 0 0 14px; font-size: 18px; color: #fafafa; }
+  .plan-section h4 { margin: 14px 0 8px; font-size: 14px; color: #d4d4d8; text-transform: uppercase; letter-spacing: .04em; }
+  .plan-section p { color: #a1a1aa; line-height: 1.65; margin: 8px 0; }
+  .plan-section ul { padding-left: 20px; color: #d4d4d8; line-height: 1.8; margin: 6px 0; }
+  .plan-section table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+  .plan-section table th { background: rgba(99,102,241,.08); color: #c7d2fe; text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border-1); font-weight: 600; }
+  .plan-section table td { padding: 10px 12px; border-bottom: 1px solid rgba(63,63,70,.4); color: #d4d4d8; }
+  .plan-pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .plan-pill.high { background: rgba(34,197,94,.15); color: #86efac; }
+  .plan-pill.mid { background: rgba(234,179,8,.15); color: #fde047; }
+  .plan-pill.low { background: rgba(239,68,68,.15); color: #fca5a5; }
+  .phase-box { border-left: 4px solid #22c55e; padding: 12px 16px; margin: 12px 0; background: rgba(34,197,94,.05); border-radius: 0 8px 8px 0; }
+  .phase-box.phase2 { border-left-color: #6366f1; background: rgba(99,102,241,.05); }
+  .phase-box.phase3 { border-left-color: #f59e0b; background: rgba(245,158,11,.05); }
+  .quote-box { background: linear-gradient(135deg, rgba(99,102,241,.08), rgba(168,85,247,.08)); border-left: 4px solid #818cf8; padding: 18px 22px; border-radius: 0 10px 10px 0; margin: 16px 0; font-style: italic; color: #e4e4e7; }
+
 </style>
 </head>
 <body>
 
-<nav class="nav">
+<nav class="nav" id="mainNav">
   <h1>Job Hunt Pro</h1>
+  <button class="nav-toggle" onclick="document.getElementById('mainNav').classList.toggle('open')" aria-label="Menu">☰</button>
   <button class="nav-btn active" onclick="switchTab('dashboard')">Dashboard</button>
   <button class="nav-btn" onclick="switchTab('analytics')">Analytics</button>
   <button class="nav-btn" onclick="switchTab('automation')">Automation</button>
@@ -1318,6 +1352,7 @@
   <button class="nav-btn" onclick="switchTab('applications')">Applications</button>
   <button class="nav-btn" onclick="switchTab('quickapply')">Quick Apply</button>
   <button class="nav-btn" onclick="switchTab('prep')">Prep</button>
+  <button class="nav-btn" onclick="switchTab('plan90')" style="background:linear-gradient(135deg,rgba(34,197,94,.12),rgba(20,184,166,.12));border-radius:8px 8px 0 0">🚀 90-Day Plan</button>
   <button class="nav-btn" onclick="switchTab('europe')" style="background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(168,85,247,.08));border-radius:8px 8px 0 0">🇪🇺 Europe Plan</button>
   <button class="nav-btn" onclick="switchTab('study')">Study Materials</button>
   <button class="nav-btn" onclick="switchTab('resources')">Resources</button>
@@ -1815,6 +1850,182 @@
   </div>
 
   <!-- ==================== SETTINGS ==================== -->
+    <div id="tab-plan90" class="tab">
+    <div class="plan-hero">
+      <h2>🚀 90-Day Plan to Crack a Product / Remote Job</h2>
+      <p>Foundation → Heavy Prep → Interview Cycle. Realistic dream target: ₹18–25 LPA Indian product co in 90 days at 80% execution.</p>
+    </div>
+
+    <div class="plan-section">
+      <h3>📊 Probability Matrix (2 yrs Java + Spring Boot + Hyderabad, 20 hrs/week effort)</h3>
+      <table>
+        <thead><tr><th>Target</th><th>Day 30</th><th>Day 60</th><th>Day 90</th></tr></thead>
+        <tbody>
+          <tr><td>Indian service co (₹8–12 LPA)</td><td><span class="plan-pill high">70%</span></td><td><span class="plan-pill high">95%</span></td><td><span class="plan-pill high">99%</span></td></tr>
+          <tr><td><b>Indian product co (₹15–22 LPA) ⭐</b></td><td><span class="plan-pill mid">15%</span></td><td><span class="plan-pill mid">40%</span></td><td><span class="plan-pill high">70%</span></td></tr>
+          <tr><td>Indian unicorn (Razorpay / Swiggy)</td><td><span class="plan-pill low">5%</span></td><td><span class="plan-pill mid">20%</span></td><td><span class="plan-pill mid">40%</span></td></tr>
+          <tr><td>Remote international ($30–50/hr)</td><td><span class="plan-pill low">5%</span></td><td><span class="plan-pill mid">15%</span></td><td><span class="plan-pill mid">30%</span></td></tr>
+          <tr><td>FAANG Hyderabad (₹25–35 LPA)</td><td><span class="plan-pill low">1%</span></td><td><span class="plan-pill low">5%</span></td><td><span class="plan-pill low">15%</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="plan-section">
+      <h3>⏰ Daily Cadence (minimum 20 hrs/week, ideal 28)</h3>
+      <ul>
+        <li><b>Mornings 7–9 AM:</b> DSA / interview prep (high cognitive load)</li>
+        <li><b>Lunch 1–1:30 PM:</b> Apply to 5–10 jobs (low effort)</li>
+        <li><b>Evenings 8–11 PM:</b> Prep + mock interviews + referral DMs</li>
+        <li><b>Weekends 10+ hrs:</b> System design + deep prep + project work</li>
+      </ul>
+    </div>
+
+    <div class="plan-section">
+      <h3>🟢 Phase 1: Foundation (Days 1–14)</h3>
+      <div class="phase-box">
+        <b>Goal:</b> Build the pipeline + start prep cadence. Polish resume → upload everywhere (LinkedIn, Naukri, Instahyre, Foundit, Cutshort, Wellfound, Hirist, Arc.dev, Turing).
+      </div>
+      <h4>Week 1 deliverables</h4>
+      <ul>
+        <li>10 DSA solved (5 easy + 2 medium Arrays, 3 medium Strings/HashMap)</li>
+        <li>1 system design topic (URL Shortener — Gaurav Sen YouTube)</li>
+        <li>1 mock interview on Pramp.com</li>
+        <li>40+ applications (Naukri + LinkedIn Easy Apply)</li>
+        <li>10 referral DMs to alumni</li>
+      </ul>
+      <h4>Week 2 deliverables</h4>
+      <ul>
+        <li>Register on Turing, Arc.dev, Toptal, Lemon.io, Micro1</li>
+        <li>Take Turing coding challenge (60 min) — milestone</li>
+        <li>20 LeetCode total · 3 system design topics · 2 mocks · 50+ applies · 20 referrals</li>
+      </ul>
+    </div>
+
+    <div class="plan-section">
+      <h3>🔵 Phase 2: Heavy Prep + Apply (Days 15–60)</h3>
+      <div class="phase-box phase2">
+        <b>Goal:</b> 100 LeetCode mediums + 10 system design topics + 5 interview invites.
+      </div>
+      <h4>LeetCode roadmap (NeetCode 150 order)</h4>
+      <ul>
+        <li><b>Week 3–4:</b> Arrays, Strings, HashMap, Two Pointers, Sliding Window (40 problems)</li>
+        <li><b>Week 5–6:</b> Trees, BFS/DFS, Backtracking, Recursion (30 problems)</li>
+        <li><b>Week 7–8:</b> Dynamic Programming, Greedy, Graphs (30 problems)</li>
+      </ul>
+      <h4>System design topics (1 per weekend)</h4>
+      <table>
+        <thead><tr><th>Week</th><th>Topic</th><th>Resource</th></tr></thead>
+        <tbody>
+          <tr><td>3</td><td>URL Shortener (TinyURL)</td><td>Gaurav Sen YouTube</td></tr>
+          <tr><td>4</td><td>Design Twitter / Instagram Feed</td><td>Gaurav Sen</td></tr>
+          <tr><td>5</td><td>Design WhatsApp / Chat System</td><td>System Design Primer (GitHub)</td></tr>
+          <tr><td>6</td><td>Design Netflix / YouTube</td><td>ByteByteGo</td></tr>
+          <tr><td>7</td><td>Design Uber / Cab Booking</td><td>Gaurav Sen</td></tr>
+          <tr><td>8</td><td>Design Rate Limiter</td><td>(you built one — easy win)</td></tr>
+          <tr><td>9</td><td>Design Notification System</td><td>ByteByteGo</td></tr>
+          <tr><td>10</td><td>Design Payment System</td><td>(you built one — your story)</td></tr>
+        </tbody>
+      </table>
+      <h4>5 behavioral STAR stories to prep</h4>
+      <ul>
+        <li>Most impactful project → Spring Boot 3 migration of 565 files</li>
+        <li>Hardest technical problem → Multi-gateway payment + HMAC + distributed lock</li>
+        <li>Conflict with colleague → think of one from Toqqer</li>
+        <li>Failure & learning → any prod bug you caught/fixed</li>
+        <li>Why leave / Why this company → growth + scale + global teams</li>
+      </ul>
+      <h4>Weekly application mix</h4>
+      <table>
+        <thead><tr><th>Channel</th><th>Apps/wk</th><th>Time</th></tr></thead>
+        <tbody>
+          <tr><td>Naukri Quick Apply (3 days fresh)</td><td>50</td><td>2 hr</td></tr>
+          <tr><td>LinkedIn Easy Apply (24 hr fresh)</td><td>20</td><td>1 hr</td></tr>
+          <tr><td>Company portal direct (top 5 dreams)</td><td>5</td><td>2 hr</td></tr>
+          <tr><td>Referral DMs (alumni network)</td><td>15</td><td>1.5 hr</td></tr>
+          <tr><td>Cutshort / Instahyre / Wellfound</td><td>10</td><td>1 hr</td></tr>
+          <tr><td>Walk-in drives (Saturdays)</td><td>1–2 events</td><td>4 hr</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="plan-section">
+      <h3>🟠 Phase 3: Interview Cycle (Days 61–90)</h3>
+      <div class="phase-box phase3">
+        <b>Goal:</b> Convert prep into 5–15 interview invites and 1–3 offers.
+      </div>
+      <h4>Standard interview pipeline</h4>
+      <ul>
+        <li>HR call (15 min) — current/expected CTC, notice period, why looking</li>
+        <li>DSA round 1 (60 min) — 1–2 LeetCode mediums, live coding</li>
+        <li>DSA round 2 (60 min) — harder mediums or 1 hard</li>
+        <li>System Design (60 min) — typically asked for SE-II / Senior roles</li>
+        <li>Behavioral / Manager (45 min) — STAR stories</li>
+        <li>Offer + negotiation</li>
+      </ul>
+      <h4>Mock interview platforms (free)</h4>
+      <ul>
+        <li><b>Pramp.com</b> — free peer-to-peer (highly recommended)</li>
+        <li><b>Interviewing.io</b> — free for some</li>
+        <li><b>CodeSignal</b> — free practice tests</li>
+        <li><b>Discord:</b> LeetCode India, NeetCode servers</li>
+      </ul>
+    </div>
+
+    <div class="plan-section">
+      <h3>🌍 Remote International Track (parallel)</h3>
+      <table>
+        <thead><tr><th>Platform</th><th>Best For</th><th>Difficulty</th></tr></thead>
+        <tbody>
+          <tr><td>Turing.com</td><td>Higher pay, reliable</td><td>Hard AI test</td></tr>
+          <tr><td>Toptal</td><td>Premium, $50–80/hr</td><td>Very hard (top 3%)</td></tr>
+          <tr><td>Arc.dev</td><td>Direct full-time roles</td><td>Medium</td></tr>
+          <tr><td>Lemon.io</td><td>EU clients, fast match</td><td>Medium</td></tr>
+          <tr><td>Crossover</td><td>High volume hiring</td><td>Tough rate cards</td></tr>
+          <tr><td>Braintrust</td><td>No middleman fee</td><td>Medium</td></tr>
+        </tbody>
+      </table>
+      <p><b>Skip:</b> Freelancer, Upwork bidding, Fiverr — race to bottom.</p>
+    </div>
+
+    <div class="plan-section">
+      <h3>📈 Daily Metrics Dashboard (track in Google Sheet)</h3>
+      <table>
+        <thead><tr><th>Day</th><th>LeetCode</th><th>Apps</th><th>Referrals</th><th>Mocks</th><th>Interviews</th><th>Offers</th></tr></thead>
+        <tbody>
+          <tr><td>Day 1</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+          <tr><td>Day 30</td><td>30</td><td>200</td><td>60</td><td>8</td><td>5</td><td>0</td></tr>
+          <tr><td>Day 60</td><td>90</td><td>500</td><td>150</td><td>16</td><td>15</td><td>0–1</td></tr>
+          <tr><td>Day 90</td><td>150</td><td>800</td><td>250</td><td>25</td><td>25</td><td>1–3</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="plan-section">
+      <h3>⚠️ 6 Things That Kill People in This Plan</h3>
+      <ul>
+        <li><b>Inconsistency.</b> Missing 3 days = restart momentum. Daily streak = compound.</li>
+        <li><b>Tutorial hell.</b> Watching DSA videos without coding = useless. Code every problem.</li>
+        <li><b>Applying without prep.</b> Razorpay interview before ready = burns the bridge.</li>
+        <li><b>Negotiation cowardice.</b> First offer is NOT the best. Always counter politely.</li>
+        <li><b>Resume tweaking obsession.</b> Stop optimizing; start applying.</li>
+        <li><b>Comparing to others.</b> Survivorship bias. Run YOUR plan.</li>
+      </ul>
+    </div>
+
+    <div class="plan-section">
+      <h3>✅ Tomorrow Morning — 4 Actions</h3>
+      <ul>
+        <li>Create Google Sheet "Job Hunt Tracker" with columns above</li>
+        <li>Solve 2 LeetCode mediums (Two Sum, Longest Substring Without Repeating Characters)</li>
+        <li>Apply to 20 Naukri jobs</li>
+        <li>Send 5 referral DMs to alumni</li>
+      </ul>
+      <p>Then do it again on Day 2. And Day 3. And Day 90.</p>
+      <div class="quote-box">"The Spring Boot 3 migration across 565 files looked impossible before I started. I did it anyway. This job search is the same problem — break it into bullets, ship daily, don't stop."</div>
+    </div>
+  </div>
+
+
   <div id="tab-settings" class="tab">
     <h2 style="margin-bottom:14px">Settings</h2>
 
