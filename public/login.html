@@ -259,7 +259,7 @@
     btn.disabled = false; btn.textContent = 'Sign in';
     if (res.ok) {
       showMsg('login-msg', 'Welcome back!', 'success');
-      window.location.href = '/';
+      window.location.href = '/dashboard';
     } else {
       showMsg('login-msg', (res.data && res.data.error) || 'Sign-in failed', 'error');
     }
@@ -277,7 +277,7 @@
     btn.disabled = false; btn.textContent = 'Create account';
     if (res.ok) {
       showMsg('signup-msg', 'Account created — redirecting...', 'success');
-      setTimeout(function(){ window.location.href = '/'; }, 600);
+      setTimeout(function(){ window.location.href = '/dashboard'; }, 600);
     } else {
       showMsg('signup-msg', (res.data && res.data.error) || 'Sign-up failed', 'error');
     }

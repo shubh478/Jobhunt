@@ -48,8 +48,13 @@ app.use('/api', require('./routes/prep'));
 app.use('/api', require('./routes/ai'));
 app.use('/api', require('./routes/europe'));
 
-// Serve frontend — redirect to /login.html if not logged in
+// Public portfolio at /
 app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'portfolio.html'));
+});
+
+// JobHunt dashboard at /dashboard — auth-gated
+app.get('/dashboard', (req, res) => {
   if (!req.userId) return res.redirect('/login.html');
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
