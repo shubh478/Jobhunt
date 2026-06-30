@@ -89,66 +89,113 @@
   ::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,.5); background-clip: content-box; }
 
   /* Nav — premium glass with refined active state */
-  .nav {
-    background: rgba(9,9,11,.75);
+  /* ============ TOP HEADER ============ */
+  .app-header {
+    position: sticky; top: 0; z-index: 60;
+    display: flex; align-items: center; gap: 16px;
+    padding: 12px 24px;
+    background: rgba(9,9,11,.85);
     backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
     border-bottom: 1px solid var(--border-1);
-    padding: 0 28px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    overflow-x: auto;
-    position: sticky;
-    top: 0;
-    z-index: 50;
   }
-  .nav::-webkit-scrollbar { display: none; }
-  .nav h1 {
+  .hamburger-btn {
+    background: rgba(63,63,70,.3);
+    border: 1px solid var(--border-1);
+    color: var(--text-2);
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
     font-size: 18px;
-    font-weight: 800;
+    transition: all .15s ease;
+  }
+  .hamburger-btn:hover { background: rgba(99,102,241,.15); border-color: rgba(99,102,241,.4); color: var(--brand-2); }
+  .app-brand {
+    font-size: 17px; font-weight: 800;
     background: linear-gradient(135deg, var(--brand-2), var(--brand-4));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     background-clip: text;
-    margin-right: 32px;
-    padding: 18px 0;
-    white-space: nowrap;
     letter-spacing: -0.025em;
-    position: relative;
+    display: flex; align-items: center; gap: 8px;
   }
-  .nav h1::before {
-    content: '⚡';
-    -webkit-text-fill-color: initial;
-    margin-right: 6px;
-    filter: drop-shadow(0 0 8px rgba(129,140,248,.5));
+  .app-brand::before { content: '⚡'; -webkit-text-fill-color: initial; filter: drop-shadow(0 0 8px rgba(129,140,248,.5)); }
+  .app-header-spacer { flex: 1; }
+  .app-user { color: var(--text-4); font-size: 12px; font-family: 'JetBrains Mono', monospace; }
+  .app-signout {
+    background: rgba(220,38,38,.08);
+    border: 1px solid rgba(220,38,38,.25);
+    color: #fca5a5;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 12px; font-weight: 600;
+    cursor: pointer;
+    transition: all .15s;
+    font-family: inherit;
   }
+  .app-signout:hover { background: rgba(220,38,38,.15); border-color: rgba(220,38,38,.45); }
+
+  /* ============ DRAWER NAV ============ */
+  .nav {
+    position: fixed; top: 0; left: 0;
+    width: 280px; height: 100vh;
+    background: linear-gradient(180deg, #0a0a0b 0%, #111114 100%);
+    border-right: 1px solid var(--border-1);
+    padding: 24px 0;
+    z-index: 100;
+    overflow-y: auto;
+    transform: translateX(-100%);
+    transition: transform .25s cubic-bezier(.4,0,.2,1);
+    box-shadow: 4px 0 32px rgba(0,0,0,.6);
+    display: flex; flex-direction: column;
+  }
+  .nav.open { transform: translateX(0); }
+  .nav h1 {
+    font-size: 18px; font-weight: 800;
+    background: linear-gradient(135deg, var(--brand-2), var(--brand-4));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    padding: 0 24px 20px;
+    margin: 0;
+    border-bottom: 1px solid var(--border-1);
+    letter-spacing: -0.025em;
+  }
+  .nav h1::before { content: '⚡'; -webkit-text-fill-color: initial; margin-right: 8px; filter: drop-shadow(0 0 8px rgba(129,140,248,.5)); }
   .nav-btn {
     background: none;
     border: none;
-    color: var(--text-4);
-    padding: 18px 16px;
+    color: var(--text-3);
+    padding: 12px 24px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 500;
-    border-bottom: 2px solid transparent;
-    transition: all .2s ease;
-    white-space: nowrap;
+    text-align: left;
+    transition: all .15s ease;
     font-family: inherit;
-    position: relative;
+    display: flex; align-items: center;
+    border-left: 3px solid transparent;
+    margin: 2px 0;
   }
-  .nav-btn:hover { color: var(--text-2); }
+  .nav-btn:hover { color: var(--text-1); background: rgba(99,102,241,.06); }
   .nav-btn.active {
-    color: var(--brand-2);
-    border-bottom-color: var(--brand-2);
-    text-shadow: 0 0 18px rgba(129,140,248,.4);
+    color: var(--text-1);
+    background: linear-gradient(90deg, rgba(99,102,241,.15), rgba(99,102,241,.02));
+    border-left-color: var(--brand-2);
+    font-weight: 600;
   }
-  .nav-btn.active::before {
-    content: '';
-    position: absolute; left: 0; right: 0; bottom: -1px; height: 24px;
-    background: linear-gradient(180deg, transparent, rgba(129,140,248,.06));
-    pointer-events: none;
+  .nav-btn[onclick*="logoutUser"] { margin-top: auto; color: #fca5a5; border-top: 1px solid var(--border-1); padding-top: 16px; }
+  .nav-btn[onclick*="logoutUser"]:hover { background: rgba(220,38,38,.1); }
+  #nav-user-email { padding: 8px 24px 4px !important; color: var(--text-4) !important; font-size: 11px !important; }
+
+  /* Overlay backdrop when drawer open */
+  .nav-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.6);
+    backdrop-filter: blur(2px);
+    z-index: 99;
   }
+  .nav-overlay.active { display: block; }
 
   .container { max-width: 1320px; margin: 0 auto; padding: 32px 24px 64px; }
   .tab { display: none; animation: fadeIn .3s ease; }
@@ -1342,25 +1389,53 @@
 </head>
 <body>
 
+<!-- Top header bar with hamburger -->
+<header class="app-header">
+  <button class="hamburger-btn" onclick="toggleNav()" aria-label="Menu">☰</button>
+  <div class="app-brand">Job Hunt Pro</div>
+  <span class="app-header-spacer"></span>
+  <span class="app-user" id="header-user-email"></span>
+  <button class="app-signout" onclick="logoutUser()">Sign out</button>
+</header>
+
+<!-- Drawer nav (slides in from left) -->
+<div class="nav-overlay" id="navOverlay" onclick="closeNav()"></div>
 <nav class="nav" id="mainNav">
   <h1>Job Hunt Pro</h1>
-  <button class="nav-toggle" onclick="document.getElementById('mainNav').classList.toggle('open')" aria-label="Menu">☰</button>
-  <button class="nav-btn active" onclick="switchTab('dashboard')">Dashboard</button>
-  <button class="nav-btn" onclick="switchTab('analytics')">Analytics</button>
-  <button class="nav-btn" onclick="switchTab('automation')">Automation</button>
-  <button class="nav-btn" onclick="switchTab('search')">Job Search</button>
-  <button class="nav-btn" onclick="switchTab('applications')">Applications</button>
-  <button class="nav-btn" onclick="switchTab('quickapply')">Quick Apply</button>
-  <button class="nav-btn" onclick="switchTab('prep')">Prep</button>
-  <button class="nav-btn" onclick="switchTab('plan90')" style="background:linear-gradient(135deg,rgba(34,197,94,.12),rgba(20,184,166,.12));border-radius:8px 8px 0 0">🚀 90-Day Plan</button>
-  <button class="nav-btn" onclick="switchTab('europe')" style="background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(168,85,247,.08));border-radius:8px 8px 0 0">🇪🇺 Europe Plan</button>
-  <button class="nav-btn" onclick="switchTab('study')">Study Materials</button>
-  <button class="nav-btn" onclick="switchTab('resources')">Resources</button>
-  <button class="nav-btn" onclick="switchTab('settings')">Settings</button>
-  <span style="flex:1"></span>
-  <span id="nav-user-email" style="color:#71717a;font-size:12px;padding:0 12px;white-space:nowrap"></span>
-  <button class="nav-btn" onclick="logoutUser()" style="color:#fca5a5">Sign out</button>
+  <button class="nav-btn active" onclick="switchTab('dashboard'); closeNav()">📊 Dashboard</button>
+  <button class="nav-btn" onclick="switchTab('analytics'); closeNav()">📈 Analytics</button>
+  <button class="nav-btn" onclick="switchTab('automation'); closeNav()">⚙️ Automation</button>
+  <button class="nav-btn" onclick="switchTab('search'); closeNav()">🔍 Job Search</button>
+  <button class="nav-btn" onclick="switchTab('applications'); closeNav()">📝 Applications</button>
+  <button class="nav-btn" onclick="switchTab('quickapply'); closeNav()">⚡ Quick Apply</button>
+  <button class="nav-btn" onclick="switchTab('prep'); closeNav()">🎯 Prep</button>
+  <button class="nav-btn" onclick="switchTab('plan90'); closeNav()">🚀 90-Day Plan</button>
+  <button class="nav-btn" onclick="switchTab('europe'); closeNav()">🇪🇺 Europe Plan</button>
+  <button class="nav-btn" onclick="switchTab('study'); closeNav()">📚 Study Materials</button>
+  <button class="nav-btn" onclick="switchTab('resources'); closeNav()">🔗 Resources</button>
+  <button class="nav-btn" onclick="switchTab('settings'); closeNav()">⚙️ Settings</button>
+  <span id="nav-user-email"></span>
+  <button class="nav-btn" onclick="logoutUser()">🚪 Sign out</button>
 </nav>
+
+<script>
+  function toggleNav() {
+    document.getElementById('mainNav').classList.toggle('open');
+    document.getElementById('navOverlay').classList.toggle('active');
+  }
+  function closeNav() {
+    document.getElementById('mainNav').classList.remove('open');
+    document.getElementById('navOverlay').classList.remove('active');
+  }
+  // Mirror user email to header on page load
+  document.addEventListener('DOMContentLoaded', function() {
+    var src = document.getElementById('nav-user-email');
+    var dst = document.getElementById('header-user-email');
+    if (src && dst) {
+      new MutationObserver(function(){ dst.textContent = src.textContent; }).observe(src, { childList: true, characterData: true, subtree: true });
+    }
+  });
+</script>
 
 <div class="container">
 
